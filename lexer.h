@@ -28,15 +28,15 @@ namespace Lexer {
         std::vector <Token> token_stream;
         int line = 0, position = 0;
         for (size_t i = 0; i < str.size();) {
-            if (is_reserved_word(str, "def", i)) {
-                token_stream.push_back(Token(TokenType::Def, line, position, 3));
+            if (is_reserved_word(str, "int", i)) {
+                token_stream.push_back(Token(TokenType::Int, line, position, 3));
                 i += 3;
                 position += 3;
             }
-            else if (is_reserved_word(str, "assume", i)) {
-                token_stream.push_back(Token(TokenType::Assume, line, position, 6));
-                i += 6;
-                position += 6;
+            else if (is_reserved_word(str, "ptr", i)) {
+                token_stream.push_back(Token(TokenType::Ptr, line, position, 3));
+                i += 3;
+                position += 3;
             }
             else if (is_reserved_word(str, "if", i)) {
                 token_stream.push_back(Token(TokenType::If, line, position, 2));
@@ -47,6 +47,21 @@ namespace Lexer {
                 token_stream.push_back(Token(TokenType::Else, line, position, 4));
                 i += 4;
                 position += 4;
+            }
+            else if (is_reserved_word(str, "while", i)) {
+                token_stream.push_back(Token(TokenType::While, line, position, 5));
+                i += 5;
+                position += 5;
+            }
+            else if (is_reserved_word(str, "def", i)) {
+                token_stream.push_back(Token(TokenType::Def, line, position, 3));
+                i += 3;
+                position += 3;
+            }
+            else if (is_reserved_word(str, "assume", i)) {
+                token_stream.push_back(Token(TokenType::Assume, line, position, 6));
+                i += 6;
+                position += 6;
             }
             else if (is_reserved_word(str, "alloc", i)) {
                 token_stream.push_back(Token(TokenType::Alloc, line, position, 5));
@@ -60,6 +75,11 @@ namespace Lexer {
             }
             else if (i + 2 <= str.size() && str.substr(i, 2) == ":=") {
                 token_stream.push_back(Token(TokenType::Assign, line, position, 2));
+                i += 2;
+                position += 2;
+            }
+            else if (i + 2 <= str.size() && str.substr(i, 2) == "<-") {
+                token_stream.push_back(Token(TokenType::Move, line, position, 2));
                 i += 2;
                 position += 2;
             }

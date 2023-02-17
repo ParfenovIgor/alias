@@ -27,6 +27,7 @@ namespace Syntax {
         std::shared_ptr <AST::Block> block = std::make_shared <AST::Block> ();
         block->line_begin = GetToken().line;
         block->position_begin = GetToken().position;
+        NextToken();
         while(CheckToken() && GetToken().type != TokenType::BraceClose) {
             std::shared_ptr <AST::Statement> _statement = ProcessStatement();
             if (_statement) {
@@ -36,8 +37,8 @@ namespace Syntax {
         if (GetToken().type != TokenType::BraceClose) {
             throw AliasException("{ expected after block", GetToken());
         }
-        block->line_begin = GetToken().line;
-        block->position_begin = GetToken().position;
+        block->line_end = GetToken().line;
+        block->position_end = GetToken().position;
         return block;
     }
 
@@ -66,6 +67,18 @@ namespace Syntax {
             _equal->line_end= _expression2->line_end;
             _equal->position_end= _expression2->position_end;
             return _equal;
+        }
+        if (GetToken().type == TokenType::Less) {
+            NextToken();
+            std::shared_ptr <AST::Expression> _expression2 = ProcessExpression();
+            std::shared_ptr <AST::Less> _less = std::make_shared <AST::Less> ();
+            _less->left = _expression1;
+            _less->right = _expression2;
+            _less->line_begin = _expression1->line_begin;
+            _less->position_begin = _expression1->position_begin;
+            _less->line_end= _expression2->line_end;
+            _less->position_end= _expression2->position_end;
+            return _less;
         }
         return _expression1;
     }
@@ -122,7 +135,6 @@ namespace Syntax {
             return nullptr;
         }
         if (GetToken().type == TokenType::BraceOpen) {
-            NextToken();
             std::shared_ptr <AST::Block> block = ProcessBlock();
             NextToken();
             return block;
@@ -144,13 +156,51 @@ namespace Syntax {
             if (GetToken().type != TokenType::BraceOpen) {
                 throw AliasException("{ expected in if block", GetToken());
             }
-            NextToken();
             std::shared_ptr <AST::Block> _block = ProcessBlock();
             _if->branch_list.push_back({_expression, _block});
             _if->line_end = GetToken().line;
             _if->position_end = GetToken().position;
             NextToken();
+
+            if (GetToken().type == TokenType::Else) {
+                NextToken();
+                if (GetToken().type != TokenType::BraceOpen) {
+                    throw AliasException("{ expected in if block", GetToken());
+                }
+                std::shared_ptr <AST::Block> _block = ProcessBlock();
+                _if->else_body = _block;
+                _if->line_end = GetToken().line;
+                _if->position_end = GetToken().position;
+                NextToken();
+            }
+
             return _if;
+        }
+        if (GetToken().type == TokenType::While) {
+            std::shared_ptr <AST::While> _while = std::make_shared <AST::While> ();
+            _while->line_begin = GetToken().line;
+            _while->position_begin = GetToken().position;
+            NextToken();
+            if (GetToken().type != TokenType::ParenthesisOpen) {
+                throw AliasException("( expected in while condition", GetToken());
+            }
+            NextToken();
+            std::shared_ptr <AST::Expression> _expression = ProcessExpression();
+            if (GetToken().type != TokenType::ParenthesisClose) {
+                throw AliasException(") expected in while condition", GetToken());
+            }
+            NextToken();
+            if (GetToken().type != TokenType::BraceOpen) {
+                throw AliasException("{ expected in while block", GetToken());
+            }
+            std::shared_ptr <AST::Block> _block = ProcessBlock();
+            _while->expression = _expression;
+            _while->block = _block;
+            _while->line_end = GetToken().line;
+            _while->position_end = GetToken().position;
+            NextToken();
+
+            return _while;
         }
         if (GetToken().type == TokenType::Def) {
             std::shared_ptr <AST::Definition> definition = std::make_shared <AST::Definition> ();
@@ -162,10 +212,15 @@ namespace Syntax {
             }
             definition->identifier = GetToken().value_string;
             NextToken();
-            if (GetToken().type != TokenType::Integer) {
-                throw AliasException("Integer expected in definition statement", GetToken());
+            if (GetToken().type != TokenType::Int && GetToken().type != TokenType::Ptr) {
+                throw AliasException("Type expected in definition statement", GetToken());
             }
-            definition->type_degree = GetToken().value_int;
+            if (GetToken().type == TokenType::Int) {
+                definition->type = AST::Type::Int;
+            }
+            else {
+                definition->type = AST::Type::Ptr;
+            }
             definition->line_end = GetToken().line;
             definition->position_end = GetToken().position;
             NextToken();
@@ -190,19 +245,37 @@ namespace Syntax {
             return _assumption;
         }
         if (GetToken().type == TokenType::Identifier) {
-            std::shared_ptr <AST::Assignment> assignment = std::make_shared <AST::Assignment> ();
-            assignment->line_begin = GetToken().line;
-            assignment->position_begin = GetToken().position;
-            assignment->identifier = GetToken().value_string;
+            int line_begin = GetToken().line;
+            int position_begin = GetToken().position;
+            std::string identifier = GetToken().value_string;
             NextToken();
-            if (GetToken().type != TokenType::Assign) {
-                throw AliasException(":= expected in assignment statement", GetToken());
+            if (GetToken().type != TokenType::Assign && GetToken().type != TokenType::Move) {
+                throw AliasException(":= or <- expected in assignment or movement statement", GetToken());
             }
-            NextToken();
-            assignment->value = ProcessExpression();
-            assignment->line_end = assignment->value->line_end;
-            assignment->position_end = assignment->value->position_end;
-            return assignment;
+
+            if (GetToken().type == TokenType::Assign) {
+                std::shared_ptr <AST::Assignment> assignment = std::make_shared <AST::Assignment> ();
+                assignment->line_begin = line_begin;
+                assignment->position_begin = position_begin;
+                assignment->identifier = identifier;
+                NextToken();
+                assignment->value = ProcessExpression();
+                assignment->line_end = assignment->value->line_end;
+                assignment->position_end = assignment->value->position_end;
+                return assignment;
+            }
+
+            if (GetToken().type == TokenType::Move) {
+                std::shared_ptr <AST::Movement> movement = std::make_shared <AST::Movement> ();
+                movement->line_begin = line_begin;
+                movement->position_begin = position_begin;
+                movement->identifier = identifier;
+                NextToken();
+                movement->value = ProcessExpression();
+                movement->line_end = movement->value->line_end;
+                movement->position_end = movement->value->position_end;
+                return movement;
+            }
         }
         throw AliasException("Statement expected", GetToken());
     }

@@ -2,6 +2,7 @@
 #define AST_H_INCLUDED
 
 #include <vector>
+#include <string>
 #include <memory>
 
 namespace AST {
@@ -9,6 +10,7 @@ class Node;
 class Statement;
 class Block;
 class If;
+class While;
 class Definition;
 class Assignment;
 class Assumption;
@@ -18,7 +20,13 @@ class Integer;
 class Alloc;
 class Free;
 class Addition;
+class Less;
 class Equal;
+
+enum class Type {
+    Int,
+    Ptr,
+};
 
 class Node {
 public:
@@ -46,15 +54,30 @@ public:
     // void Print(std::ostream &out, int ind = 0);
 };
 
+class While : public Statement {
+public:
+    std::shared_ptr <Expression> expression;
+    std::shared_ptr <Block> block;
+    void Validate();
+};
+
 class Definition : public Statement {
 public:
     std::string identifier;
-    int type_degree;
+    Type type;
     void Validate();
     // void Print(std::ostream &out, int ind = 0);
 };
 
 class Assignment : public Statement {
+public:
+    std::string identifier;
+    std::shared_ptr <Expression> value;
+    void Validate();
+    // void Print(std::ostream &out, int ind = 0);
+};
+
+class Movement : public Statement {
 public:
     std::string identifier;
     std::shared_ptr <Expression> value;
@@ -100,6 +123,13 @@ public:
 };
 
 class Addition : public Expression {
+public:
+    std::shared_ptr <Expression> left, right;
+    void Validate();
+    // void Print(std::ostream &out, int ind = 0);
+};
+
+class Less : public Expression {
 public:
     std::shared_ptr <Expression> left, right;
     void Validate();
