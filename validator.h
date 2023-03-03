@@ -12,9 +12,6 @@ namespace AST {
 
     bool operator < (const State &a, const State &b);
 
-    int getIndex(std::string id);
-    Type getType(std::string id);
-    // void simplifyStates();
     void printStatesLog();
 
 }

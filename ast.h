@@ -11,6 +11,7 @@ class Statement;
 class Block;
 class If;
 class While;
+class FunctionDefinition;
 class Definition;
 class Assignment;
 class Assumption;
@@ -19,6 +20,7 @@ class Identifier;
 class Integer;
 class Alloc;
 class Free;
+class Dereference;
 class Addition;
 class Less;
 class Equal;
@@ -28,12 +30,18 @@ enum class Type {
     Ptr,
 };
 
+class FunctionSignature {
+public:
+    std::vector < std::string > identifiers;
+    std::vector <Type> types;
+    std::vector <int> sizes;
+};
+
 class Node {
 public:
     virtual ~Node(){};
     virtual void Validate() = 0;
     int line_begin, position_begin, line_end, position_end;
-    // virtual void Print(std::ostream &out, int ind = 0) = 0;
 };
 
 class Statement : public Node {
@@ -43,7 +51,6 @@ class Block : public Statement {
 public:
     std::vector <std::shared_ptr <Statement>> statement_list;
     void Validate();
-    // void Print(std::ostream &out, int ind = 0);
 };
 
 class If : public Statement {
@@ -51,7 +58,6 @@ public:
     std::vector < std::pair <std::shared_ptr <Expression>, std::shared_ptr<Block>>> branch_list;
     std::shared_ptr <Block> else_body;
     void Validate();
-    // void Print(std::ostream &out, int ind = 0);
 };
 
 class While : public Statement {
@@ -61,12 +67,19 @@ public:
     void Validate();
 };
 
+class FunctionDefinition : public Statement {
+public:
+    std::string name;
+    std::shared_ptr <FunctionSignature> signature;
+    std::shared_ptr <Block> body;
+    void Validate();
+};
+
 class Definition : public Statement {
 public:
     std::string identifier;
     Type type;
     void Validate();
-    // void Print(std::ostream &out, int ind = 0);
 };
 
 class Assignment : public Statement {
@@ -74,7 +87,6 @@ public:
     std::string identifier;
     std::shared_ptr <Expression> value;
     void Validate();
-    // void Print(std::ostream &out, int ind = 0);
 };
 
 class Movement : public Statement {
@@ -82,14 +94,12 @@ public:
     std::string identifier;
     std::shared_ptr <Expression> value;
     void Validate();
-    // void Print(std::ostream &out, int ind = 0);
 };
 
 class Assumption : public Statement {
 public:
     std::shared_ptr <Expression> condition;
     void Validate();
-    // void Print(std::ostream &out, int ind = 0);
 };
 
 class Expression : public Node {
@@ -99,48 +109,55 @@ class Identifier : public Expression {
 public:
     std::string identifier;
     void Validate();
-    // void Print(std::ostream &out, int ind = 0);
 };
 
 class Integer : public Expression {
 public:
     int value;
     void Validate();
-    // void Print(std::ostream &out, int ind = 0);
 };
 
 class Alloc : public Expression {
 public:
     int size;
     void Validate();
-    // void Print(std::ostream &out, int ind = 0);
 };
 
-class Free : public Expression {
+class Free : public Statement {
 public:
+    std::shared_ptr <Expression> arg;
     void Validate();
-    // void Print(std::ostream &out, int ind = 0);
+};
+
+class FunctionCall : public Statement {
+public:
+    std::string identifier;
+    std::vector < std::string > arguments;
+    void Validate();
+};
+
+class Dereference : public Expression {
+public:
+    std::shared_ptr <Expression> arg;
+    void Validate();
 };
 
 class Addition : public Expression {
 public:
     std::shared_ptr <Expression> left, right;
     void Validate();
-    // void Print(std::ostream &out, int ind = 0);
 };
 
 class Less : public Expression {
 public:
     std::shared_ptr <Expression> left, right;
     void Validate();
-    // void Print(std::ostream &out, int ind = 0);
 };
 
 class Equal : public Expression {
 public:
     std::shared_ptr <Expression> left, right;
     void Validate();
-    // void Print(std::ostream &out, int ind = 0);
 };
 
 }

@@ -53,6 +53,11 @@ namespace Lexer {
                 i += 5;
                 position += 5;
             }
+            else if (is_reserved_word(str, "func", i)) {
+                token_stream.push_back(Token(TokenType::Func, line, position, 4));
+                i += 4;
+                position += 4;
+            }
             else if (is_reserved_word(str, "def", i)) {
                 token_stream.push_back(Token(TokenType::Def, line, position, 3));
                 i += 3;
@@ -73,6 +78,11 @@ namespace Lexer {
                 i += 4;
                 position += 4;
             }
+            else if (is_reserved_word(str, "call", i)) {
+                token_stream.push_back(Token(TokenType::Call, line, position, 4));
+                i += 4;
+                position += 4;
+            }
             else if (i + 2 <= str.size() && str.substr(i, 2) == ":=") {
                 token_stream.push_back(Token(TokenType::Assign, line, position, 2));
                 i += 2;
@@ -82,6 +92,11 @@ namespace Lexer {
                 token_stream.push_back(Token(TokenType::Move, line, position, 2));
                 i += 2;
                 position += 2;
+            }
+            else if (i + 1 <= str.size() && str.substr(i, 1) == ",") {
+                token_stream.push_back(Token(TokenType::Comma, line, position, 1));
+                i += 1;
+                position += 1;
             }
             else if (i + 1 <= str.size() && str.substr(i, 1) == ";") {
                 token_stream.push_back(Token(TokenType::Semicolon, line, position, 1));
@@ -108,6 +123,11 @@ namespace Lexer {
                 i += 1;
                 position += 1;
             }
+            else if (i + 1 <= str.size() && str.substr(i, 1) == "$") {
+                token_stream.push_back(Token(TokenType::Dereference, line, position, 1));
+                i += 1;
+                position += 1;
+            }
             else if (i + 1 <= str.size() && str.substr(i, 1) == "+") {
                 token_stream.push_back(Token(TokenType::Plus, line, position, 1));
                 i += 1;
@@ -115,12 +135,12 @@ namespace Lexer {
             }
             else if (i + 1 <= str.size() && str.substr(i, 1) == "-") {
                 if (i + 2 <= str.size() && is_digit(str[i + 1])) {
-                    i++;
                     int l = i;
+                    i++;
                     i++;
                     while (i + 1 <= str.size() && is_digit(str[i])) i++;
                     int r = i - 1;
-                    token_stream.push_back(Token(TokenType::Integer, -atoi(str.substr(l, r - l + 1).c_str()), line, position, r - l + 1));
+                    token_stream.push_back(Token(TokenType::Integer, atoi(str.substr(l, r - l + 1).c_str()), line, position, r - l + 1));
                     position += r - l + 1;
                 }
                 else {

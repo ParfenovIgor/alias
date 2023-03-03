@@ -35,7 +35,7 @@ namespace Syntax {
             }
         }
         if (GetToken().type != TokenType::BraceClose) {
-            throw AliasException("{ expected after block", GetToken());
+            throw AliasException("} expected after block", GetToken());
         }
         block->line_end = GetToken().line;
         block->position_end = GetToken().position;
@@ -84,6 +84,17 @@ namespace Syntax {
     }
 
     std::shared_ptr <AST::Expression> ProcessPrimary() {
+        if (GetToken().type == TokenType::Dereference) {
+            std::shared_ptr <AST::Dereference> _dereference = std::make_shared <AST::Dereference> ();
+            _dereference->line_begin = GetToken().line;
+            _dereference->position_begin = GetToken().position;
+            NextToken();
+            std::shared_ptr <AST::Expression> _expression = ProcessPrimary();
+            _dereference->line_end = _expression->line_end;
+            _dereference->position_end = _expression->position_end;
+            _dereference->arg = _expression;
+            return _dereference;
+        }
         if (GetToken().type == TokenType::Identifier) {
             std::shared_ptr <AST::Identifier> _identifier = std::make_shared <AST::Identifier> ();
             _identifier->identifier = GetToken().value_string;
@@ -202,6 +213,65 @@ namespace Syntax {
 
             return _while;
         }
+        if (GetToken().type == TokenType::Func) {
+            std::shared_ptr <AST::FunctionDefinition> function_definition = std::make_shared <AST::FunctionDefinition> ();
+            function_definition->line_begin = GetToken().line;
+            function_definition->position_begin = GetToken().position;
+            NextToken();
+            if (GetToken().type != TokenType::Identifier) {
+                throw AliasException("Identifier exprected in function definition", GetToken());
+            }
+            function_definition->name = GetToken().value_string;
+            NextToken();
+            if (GetToken().type != TokenType::ParenthesisOpen) {
+                throw AliasException("( expected in function definition", GetToken());
+            }
+            NextToken();
+            std::shared_ptr <AST::FunctionSignature> function_signature = std::make_shared <AST::FunctionSignature> ();
+            while (true) {
+                if (GetToken().type != TokenType::Identifier) {
+                    throw AliasException("Idenfier expected in argument list", GetToken());
+                }
+                function_signature->identifiers.push_back(GetToken().value_string);
+                NextToken();
+                if (GetToken().type != TokenType::Int && GetToken().type != TokenType::Ptr) {
+                    throw AliasException("Type expected in argument list", GetToken());
+                }
+                if (GetToken().type == TokenType::Int) {
+                    function_signature->types.push_back(AST::Type::Int);
+                    NextToken();
+                    function_signature->sizes.push_back(0);
+                }
+                else {
+                    function_signature->types.push_back(AST::Type::Ptr);
+                    NextToken();
+                    if (GetToken().type != TokenType::Integer) {
+                        throw AliasException("Integer expected in pointer argument", GetToken());
+                    }
+                    function_signature->sizes.push_back(GetToken().value_int);
+                    NextToken();
+                }
+                if (GetToken().type == TokenType::ParenthesisClose) {
+                    NextToken();
+                    break;
+                }
+                if (GetToken().type != TokenType::Comma) {
+                    throw AliasException(", expected in argument list", GetToken());
+                }
+                NextToken();
+            }
+            function_definition->signature = function_signature;
+            if (GetToken().type != TokenType::BraceOpen) {
+                throw AliasException("{ expected in function block", GetToken());
+            }
+            std::shared_ptr <AST::Block> _block = ProcessBlock();
+            function_definition->body = _block;
+            function_definition->line_end = GetToken().line;
+            function_definition->position_end = GetToken().position;
+            NextToken();
+
+            return function_definition;
+        }
         if (GetToken().type == TokenType::Def) {
             std::shared_ptr <AST::Definition> definition = std::make_shared <AST::Definition> ();
             definition->line_begin = GetToken().line;
@@ -243,6 +313,60 @@ namespace Syntax {
             _assumption->position_end = GetToken().position;
             NextToken();
             return _assumption;
+        }
+        if (GetToken().type == TokenType::Free) {
+            std::shared_ptr <AST::Free> _free = std::make_shared <AST::Free> ();
+            _free->line_begin = GetToken().line;
+            _free->position_begin = GetToken().position;
+            NextToken();
+            if (GetToken().type != TokenType::ParenthesisOpen) {
+                throw AliasException("( expected in free statement", GetToken());
+            }
+            NextToken();
+            std::shared_ptr <AST::Expression> _expression = ProcessExpression();
+            _free->arg = _expression;
+            if (GetToken().type != TokenType::ParenthesisClose) {
+                throw AliasException(") expected in free expression", GetToken());
+            }
+            _free->line_end = GetToken().line;
+            _free->position_end = GetToken().position;
+            NextToken();
+            return _free;
+        }
+        if (GetToken().type == TokenType::Call) {
+            std::shared_ptr <AST::FunctionCall> function_call = std::make_shared <AST::FunctionCall> ();
+            function_call->line_begin = GetToken().line;
+            function_call->position_begin = GetToken().position;
+            NextToken();
+            if (GetToken().type != TokenType::Identifier) {
+                throw AliasException("Identifier expected in function call", GetToken());
+            }
+            function_call->identifier = GetToken().value_string;
+            NextToken();
+            if (GetToken().type != TokenType::ParenthesisOpen) {
+                throw AliasException("( expected in function call", GetToken());
+            }
+            NextToken();
+            while (true) {
+                if (GetToken().type == TokenType::Identifier) {
+                    function_call->arguments.push_back(GetToken().value_string);
+                }
+                else {
+                    throw AliasException("Identifier expected in function call", GetToken());
+                }
+                NextToken();
+                if (GetToken().type == TokenType::ParenthesisClose) {
+                    break;
+                }
+                if (GetToken().type != TokenType::Comma) {
+                    throw AliasException(", expectred in function call", GetToken());
+                }
+                NextToken();
+            }
+            function_call->line_end = GetToken().line;
+            function_call->position_end = GetToken().position;
+            NextToken();
+            return function_call;
         }
         if (GetToken().type == TokenType::Identifier) {
             int line_begin = GetToken().line;
