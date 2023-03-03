@@ -140,6 +140,8 @@ void If::Validate() {
         states.insert(state);
     for (State state : _states2)
         states.insert(state);
+    
+    checkLeak(this);
 }
 
 void While::Validate() {
@@ -155,9 +157,18 @@ void While::Validate() {
         if (n_heap != (int)heap_size.size()) {
             throw AliasException("Inexpected allocation in while loop", this);
         }
-        if (states == _states)
+        bool add = false;
+        for (State state : states) {
+            if (_states.find(state) == _states.end())
+                add = true;
+            _states.insert(state);
+        }
+        if (!add)
             break;
+        states = _states;
     }
+
+    checkLeak(this);
 }
 
 void FunctionDefinition::Validate() {
@@ -276,6 +287,9 @@ void Assignment::Validate() {
             states = _states;
         }
     }
+    else {
+        value->Validate();
+    }
     checkLeak(this);
 }
 
@@ -385,7 +399,7 @@ void Free::Validate() {
                 heap_id = state.heap[ind].first;
             }
             else if (heap_id != state.heap[ind].first) {
-                throw AliasException("Validation fault", this);
+                throw AliasException("Unpredictible free", this);
             }
         }
         heap_size[heap_id] = 0;
