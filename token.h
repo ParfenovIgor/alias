@@ -7,6 +7,7 @@ enum class TokenType {
     BraceClose,
     ParenthesisOpen,
     ParenthesisClose,
+    Asm,
     Comma,
     Semicolon,
     Int,
@@ -34,31 +35,38 @@ enum class TokenType {
 
 class Token {
 public:
-    Token(TokenType _type, int _line, int _position, int _length) {
+    Token(TokenType _type, int _line_begin, int _position_begin, int _line_end, int _position_end, std::string _filename) {
         type = _type;
-        line = _line;
-        position = _position;
-        length = _length;
+        line_begin = _line_begin;
+        position_begin = _position_begin;
+        line_end = _line_end;
+        position_end = _position_end;
+        filename = _filename;
     }
-    Token(TokenType _type, int _value_int, int _line, int _position, int _length) {
+    Token(TokenType _type, int _value_int, int _line_begin, int _position_begin, int _line_end, int _position_end, std::string _filename) {
         type = _type;
         value_int = _value_int;
-        line = _line;
-        position = _position;
-        length = _length;
+        line_begin = _line_begin;
+        position_begin = _position_begin;
+        line_end = _line_end;
+        position_end = _position_end;
+        filename = _filename;
     }
-    Token(TokenType _type, std::string _value_string, int _line, int _position, int _length) {
+    Token(TokenType _type, std::string _value_string, int _line_begin, int _position_begin, int _line_end, int _position_end, std::string _filename) {
         type = _type;
         value_string = _value_string;
-        line = _line;
-        position = _position;
-        length = _length;
+        line_begin = _line_begin;
+        position_begin = _position_begin;
+        line_end = _line_end;
+        position_end = _position_end;
+        filename = _filename;
     }
 
     TokenType type;
     int value_int;
     std::string value_string;
-    int line, position, length;
+    int line_begin, position_begin, line_end, position_end;
+    std::string filename;
 };
 
 #endif // TOKEN_H_INCLUDED

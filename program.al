@@ -1,40 +1,43 @@
 {
-func queue_push (q ptr 50, sz ptr 1, v int) {
-    def a ptr
-    def b int
-    a := q + 0
-    b := $sz
-    while (1) {
-        a := a + 1
-        assume (a < q + 50)
-    }
-    a <- v
-    sz <- $sz + 1
-}
+    /* func print(a int) {
+        asm {
+            jmp afterbuffer1
+            buffer1 db "%d", 0xA, 0x0
+            afterbuffer1:
+            push dword [ebp + 8]
+            push buffer1
+            call printf
+            add esp, 0x8
+        }
+    } */
 
-func queue_pop (q ptr 50, sz ptr 1, v ptr 1) {
-    def a ptr
-    a := q + 0
-    while (1) {
-        a := a + 1
-        assume (a < q + 50)
+    func addition(a int, b int, c ptr 1 1) {
+        func helper(a int, c ptr 1 1) {
+            def b int
+            b := a + $c
+            c <- b
+        }
+        c <- 0
+        call helper(a, c)
+        call helper(b, c)
     }
-    v <- $a
-    sz <- $sz + -1
-}
 
-def queue ptr
-queue := alloc (50)
-def sz ptr
-sz := alloc (1)
-sz <- 0
-def v int
-v := 3
-call queue_push (queue, sz, v)
-v := 4
-call queue_push (queue, sz, v)
-def x ptr
-x := alloc (1)
-call queue_pop (queue, sz, x)
-call queue_pop (queue, sz, x)
+    /* def a int ; a := 3
+    def b int ; b := 31
+    def c ptr ; c := alloc(1)
+
+    call print(a)
+
+    call addition(a, b, c)
+    a := $c
+    call print(a)
+    
+    a := 5
+
+    while (a) {
+        call print(a)
+        a := a + -1
+    }
+
+    free(c) */
 }
