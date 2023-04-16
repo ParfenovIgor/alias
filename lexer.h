@@ -42,7 +42,7 @@ namespace Lexer {
                     }
                 }
                 if (i == (int)str.size()) {
-                    throw AliasException("{ expected after asm", line_begin, position_begin, line, position);
+                    throw AliasException("{ expected after asm", line_begin, position_begin, line, position, filename);
                 }
                 std::string code;
                 i++;
@@ -56,9 +56,43 @@ namespace Lexer {
                     }
                 }
                 if (i == (int)str.size()) {
-                    throw AliasException("} expected after asm", line_begin, position_begin, line, position);
+                    throw AliasException("} expected after asm", line_begin, position_begin, line, position, filename);
                 }
                 token_stream.push_back(Token(TokenType::Asm, code, line_begin, position_begin, line, position, filename));
+                position++;
+                i++;
+            }
+            else if (is_reserved_word(str, "include", i)) {
+                int position_begin = position;
+                int line_begin = line;
+                i += 7;
+                position += 7;
+                while (i < (int)str.size() && str[i] != '{') {
+                    i++;
+                    position++;
+                    if (str[i] == '\n') {
+                        position = -1;
+                        line++;
+                    }
+                }
+                if (i == (int)str.size()) {
+                    throw AliasException("{ expected after include", line_begin, position_begin, line, position, filename);
+                }
+                std::string code;
+                i++;
+                while (i < (int)str.size() && str[i] != '}') {
+                    code.push_back(str[i]);
+                    i++;
+                    position++;
+                    if (str[i] == '\n') {
+                        position = -1;
+                        line++;
+                    }
+                }
+                if (i == (int)str.size()) {
+                    throw AliasException("} expected after include", line_begin, position_begin, line, position, filename);
+                }
+                token_stream.push_back(Token(TokenType::Include, code, line_begin, position_begin, line, position, filename));
                 position++;
                 i++;
             }
@@ -229,7 +263,7 @@ namespace Lexer {
                     }
                 }
                 if (i == str.size())
-                    throw AliasException("Non closed string", l_line, l_position, line, position);
+                    throw AliasException("Non closed string", l_line, l_position, line, position, filename);
                 int r = i - 1;
                 token_stream.push_back(Token(TokenType::String, str.substr(l, r - l + 1), l_line, l_position, line, position, filename));
                 position++;
@@ -261,7 +295,7 @@ namespace Lexer {
                 line++;
             }
             else {
-                throw AliasException("Unexpected symbol", line, position, line, position);
+                throw AliasException("Unexpected symbol", line, position, line, position, filename);
             }
         }
 

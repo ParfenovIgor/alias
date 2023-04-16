@@ -6,15 +6,29 @@
 #include "ast.h"
 
 namespace Syntax {
-    void SetTokenStream(const std::vector <Token> &_TokenStream);
-    Token GetToken();
-    bool NextToken();
-    bool CheckToken();
+    class TokenStream {
+    private:
+        std::vector <Token> stream;
+        int pos;
+    public:
+        TokenStream(std::vector <Token> _stream) {
+            stream = _stream;
+            pos = 0;
+        }
 
-    std::shared_ptr <AST::Block> ProcessBlock();
-    std::shared_ptr <AST::Expression> ProcessExpression();
-    std::shared_ptr <AST::Expression> ProcessPrimary();
-    std::shared_ptr <AST::Statement> ProcessStatement();
+        Token GetToken() {
+            return stream[pos];
+        }
+
+        void NextToken() {
+            pos++;
+        }
+    };
+
+    std::shared_ptr <AST::Block> ProcessBlock(TokenStream&);
+    std::shared_ptr <AST::Expression> ProcessExpression(TokenStream&);
+    std::shared_ptr <AST::Expression> ProcessPrimary(TokenStream&);
+    std::shared_ptr <AST::Statement> ProcessStatement(TokenStream&);
     std::shared_ptr <AST::Node> Process(const std::vector <Token> token_stream);
 }
 

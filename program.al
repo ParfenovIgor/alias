@@ -1,5 +1,5 @@
 {
-    /* func print(a int) {
+    /*func print(a int) {
         asm {
             jmp afterbuffer1
             buffer1 db "%d", 0xA, 0x0
@@ -9,7 +9,7 @@
             call printf
             add esp, 0x8
         }
-    } */
+    }
 
     func addition(a int, b int, c ptr 1 1) {
         func helper(a int, c ptr 1 1) {
@@ -20,9 +20,13 @@
         c <- 0
         call helper(a, c)
         call helper(b, c)
-    }
+    }*/
 
-    /* def a int ; a := 3
+    include {inc.al}
+
+    d := d + 2
+
+    /*def a int ; a := 3
     def b int ; b := 31
     def c ptr ; c := alloc(1)
 
@@ -39,5 +43,5 @@
         a := a + -1
     }
 
-    free(c) */
+    free(c)*/
 }

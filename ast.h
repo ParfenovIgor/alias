@@ -45,7 +45,9 @@ struct State {
 
 struct VLContext {
     std::vector < std::string > variable_stack;
-    std::vector < std::pair < std::string, std::shared_ptr <FunctionSignature> > > function_stack;
+    std::vector <Type> variable_type_stack;
+    std::vector < std::string > function_stack;
+    std::vector < std::shared_ptr <FunctionSignature> > function_signature_stack;
     std::vector <int> packet_size;
     std::set <State> states;
 };
@@ -64,6 +66,7 @@ public:
     virtual void Validate(VLContext &context) = 0;
     virtual void Compile(std::ostream &out, CPContext &context) = 0;
     int line_begin, position_begin, line_end, position_end;
+    std::string filename;
 };
 
 class Statement : public Node {

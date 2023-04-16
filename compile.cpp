@@ -48,7 +48,6 @@ void Compile(std::shared_ptr <Node> node, std::ostream &out) {
     out << "global main\n";
     out << "extern malloc\n";
     out << "extern free\n";
-    out << "extern printf\n";
     out << "section .text\n";
     out << "main:\n";
     out << "push ebp\n";
@@ -193,6 +192,11 @@ void FunctionCall::Compile(std::ostream &out, CPContext &context) {
     int idx = findFunctionIndex(identifier, context);
     out << "call _fun" << idx << "\n";
     out << "add esp, " << (int)arguments.size() * 4 << "\n";
+    for (int i = (int)arguments.size() - 1; i >= 0; i--) {
+        int phase = findPhase(arguments[i], context);
+        out << "mov eax, [esp - " << (((int)arguments.size() - i) * 4) << "]\n";
+        out << "mov [ebp + " << phase << "], eax\n";
+    }
 }
 
 void Dereference::Compile(std::ostream &out, CPContext &context) {
@@ -217,9 +221,41 @@ void Addition::Compile(std::ostream &out, CPContext &context) {
 }
 
 void Less::Compile(std::ostream &out, CPContext &context) {
+    out << "; less\n";
+    left->Compile(out, context);
+    out << "sub esp, 4\n";
+    context.variable_stack.push_back("__junk");
+    right->Compile(out, context);
+    out << "add esp, 4\n";
+    context.variable_stack.pop_back();
+    out << "mov eax, [esp - 4]\n";
+    out << "sub eax, [esp - 8]\n";
+    int idx = context.branch_index++;
+    out << "jl " << "_set1_" << idx << "\n";
+    out << "mov [esp - 4], 0\n";
+    out << "jmp _setend" << idx << "\n";
+    out << "_set1_" << idx << ":\n";
+    out << "mov [esp - 4], 1\n";
+    out << "_setend" << idx << ":\n";
 }
 
 void Equal::Compile(std::ostream &out, CPContext &context) {
+    out << "; less\n";
+    left->Compile(out, context);
+    out << "sub esp, 4\n";
+    context.variable_stack.push_back("__junk");
+    right->Compile(out, context);
+    out << "add esp, 4\n";
+    context.variable_stack.pop_back();
+    out << "mov eax, [esp - 4]\n";
+    out << "sub eax, [esp - 8]\n";
+    int idx = context.branch_index++;
+    out << "jz " << "_set1_" << idx << "\n";
+    out << "mov [esp - 4], 0\n";
+    out << "jmp _setend" << idx << "\n";
+    out << "_set1_" << idx << ":\n";
+    out << "mov [esp - 4], 1\n";
+    out << "_setend" << idx << ":\n";
 }
 
 }

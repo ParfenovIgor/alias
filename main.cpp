@@ -1,12 +1,7 @@
 #include <iostream>
 
-#include "lexer.h"
-#include "syntax.h"
-#include "validator.h"
-#include "compile.h"
-#include "exception.h"
 #include "process.h"
-#include "state.h"
+#include "settings.h"
 
 void help() {
     std::cout << "HELP" << std::endl;
@@ -21,8 +16,11 @@ int main(int argc, char *argv[]) {
         std::string filename;
         for (int i = 1; i < argc; i++) {
             std::string arg(argv[i]);
-            if (arg == "-S") {
-                Settings::GetTarget() = Settings::Target::Server;
+            if (arg == "-v") {
+                Settings::SetServer(true);
+            }
+            else if(arg == "-c") {
+                Settings::SetCompile(true);
             }
             else {
                 filename = arg;
@@ -34,6 +32,6 @@ int main(int argc, char *argv[]) {
             return 0;
         }
 
-        return process(filename);
+        return Process(filename);
     }
 }
