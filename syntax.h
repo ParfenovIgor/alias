@@ -8,9 +8,9 @@
 namespace Syntax {
     class TokenStream {
     private:
+    public:
         std::vector <Token> stream;
         int pos;
-    public:
         TokenStream(std::vector <Token> _stream) {
             stream = _stream;
             pos = 0;
@@ -25,6 +25,7 @@ namespace Syntax {
         }
     };
 
+    std::shared_ptr <AST::Block> ProcessProgram(TokenStream&);
     std::shared_ptr <AST::Block> ProcessBlock(TokenStream&);
     std::shared_ptr <AST::Expression> ProcessExpression(TokenStream&);
     std::shared_ptr <AST::Expression> ProcessPrimary(TokenStream&);

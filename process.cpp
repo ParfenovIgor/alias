@@ -22,7 +22,7 @@ std::shared_ptr <AST::Node> Parse(std::string filename) {
     std::vector <Token> token_stream;
     std::shared_ptr <AST::Node> node;
     try {
-        token_stream = Lexer::process(buffer.str(), filename);
+        token_stream = Lexer::Process(buffer.str(), filename);
     }
     catch (AliasException &ex) {
         std::cout << "Error" << std::endl;
@@ -64,11 +64,17 @@ int Process(std::string filename) {
     }
 
     if (Settings::GetCompile()) {
-        std::ofstream file("program.asm");
+        std::string output_filename = Settings::GetOutputFilename();
+        std::ofstream file(output_filename + ".asm");
         AST::Compile(node, file);
         file.close();
-        system("nasm -f elf32 program.asm -o program.o");
-        system("gcc -m32 program.o -no-pie -o program");
+        
+        if (Settings::GetLink()){
+            std::string cmd = "nasm -f elf32 " + output_filename + ".asm -o " + output_filename + ".o";
+            system(cmd.c_str());
+            cmd = "gcc -m32 " + output_filename + ".o -no-pie -o " + output_filename;
+            system(cmd.c_str());
+        }
     }
 
     return 0;

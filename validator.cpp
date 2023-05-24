@@ -181,6 +181,8 @@ void While::Validate(VLContext &context) {
 void FunctionDefinition::Validate(VLContext &context) {
     VLContext _context = context;
     context = VLContext();
+    context.function_stack = _context.function_stack;
+    context.function_signature_stack = _context.function_signature_stack;
 
     int n = (int)signature->identifiers.size();
     State state;
@@ -219,17 +221,14 @@ void FunctionDefinition::Validate(VLContext &context) {
                 }
             }
             else {
-                if (state.heap[i].first == -1) {
+                if (state.heap[i].first == -1 || state.heap[i].second != 0 || context.packet_size[state.heap[i].second] < signature->size_out[i]) {
                     throw AliasException("Function post condition failed", this);
                 }
                 if (packet_num[i] == -2) {
                     packet_num[i] = state.heap[i].first;
                 }
                 else if (state.heap[i].first != packet_num[i]) {
-                    throw AliasException("Function post condition has several heaps", this);
-                }
-                if (state.heap[i].second < 0 || context.packet_size[packet_num[i]] - state.heap[i].second < signature->size_out[i]) {
-                    throw AliasException("Function post condition failed", this);
+                    throw AliasException("Function post condition has several packets", this);
                 }
             }
         }
@@ -246,6 +245,11 @@ void FunctionDefinition::Validate(VLContext &context) {
     }
 
     context = _context;
+    context.function_stack.push_back(name);
+    context.function_signature_stack.push_back(signature);
+}
+
+void Prototype::Validate(VLContext &context) {
     context.function_stack.push_back(name);
     context.function_signature_stack.push_back(signature);
 }
@@ -481,17 +485,14 @@ void FunctionCall::Validate(VLContext &context) {
                     }
                 }
                 else {
-                    if (state.heap[index].first == -1) {
+                    if (state.heap[index].first == -1 || state.heap[index].second != 0 || context.packet_size[state.heap[index].first] < signature->size_in[i]) {
                         throw AliasException("Function pre condition failed", this);
                     }
                     if (packet_num[i] == -2) {
                         packet_num[i] = state.heap[index].first;
                     }
                     else if (state.heap[index].first != packet_num[i]) {
-                        throw AliasException("Function pre condition has several heaps", this);
-                    }
-                    if (state.heap[index].second < 0 || context.packet_size[packet_num[i]] - state.heap[index].second < signature->size_in[i]) {
-                        throw AliasException("Function pre condition failed", this);
+                        throw AliasException("Function pre condition has several packets", this);
                     }
                 }
             }

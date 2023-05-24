@@ -106,27 +106,50 @@ void While::Compile(std::ostream &out, CPContext &context) {
 }
 
 void FunctionDefinition::Compile(std::ostream &out, CPContext &context) {
+    std::string identifier, identifier_end;
+    int index;
+    if (external) {
+        identifier = name;
+        identifier_end = "_funend" + name;
+        index = -1;
+    }
+    else {
+        identifier = "_fun" + std::to_string(context.function_index);
+        identifier_end = "_funend" + std::to_string(context.function_index);
+        index = context.function_index;
+        context.function_index++;
+    }
+
     out << "; function definition\n";
-    int idx = context.function_index;
-    out << "jmp _funend" << idx << "\n";
-    out << "_fun" << idx << ":\n";
+    if (external) {
+        out << "global " << identifier << "\n";
+    }
+    out << "jmp " << identifier_end << "\n";
+    out << identifier << ":\n";
     out << "push ebp\n";
     out << "mov ebp, esp\n";
     out << "sub esp, " << (signature->identifiers.size() + 2) * 4 << "\n";
-    CPContext _context;
-    _context.function_index = context.function_index;
+    
+    std::vector <std::string> variable_stack = context.variable_stack;
+    std::vector <std::string> variable_arguments = context.variable_arguments;
+    context.variable_stack.clear();
+    context.variable_arguments.clear();
+    context.function_stack.push_back({name, index});
     for (int i = 0; i < (int)signature->identifiers.size(); i++) {
-        _context.variable_arguments.push_back(signature->identifiers[i]);
+        context.variable_arguments.push_back(signature->identifiers[i]);
     }
-    int function_index = _context.function_index;
-    _context.function_stack.push_back({name, function_index});
-    _context.function_index++;
-    body->Compile(out, _context);
-    context.function_index = _context.function_index;
-    context.function_stack.push_back({name, function_index});
+    body->Compile(out, context);
+    context.variable_stack = variable_stack;
+    context.variable_arguments = variable_arguments;
+
     out << "leave\n";
     out << "ret\n";
-    out << "_funend" << idx << ":\n";
+    out << identifier_end << ":\n";
+}
+
+void Prototype::Compile(std::ostream &out, CPContext &context) {
+    out << "extern " << name << "\n";
+    context.function_stack.push_back({name, -1});
 }
 
 void Definition::Compile(std::ostream &out, CPContext &context) {
@@ -190,7 +213,12 @@ void FunctionCall::Compile(std::ostream &out, CPContext &context) {
         out << "push dword [ebp + " << phase << "]\n";
     }
     int idx = findFunctionIndex(identifier, context);
-    out << "call _fun" << idx << "\n";
+    if (idx == -1) {
+        out << "call " << identifier << "\n";
+    }
+    else {
+        out << "call _fun" << idx << "\n";
+    }
     out << "add esp, " << (int)arguments.size() * 4 << "\n";
     for (int i = (int)arguments.size() - 1; i >= 0; i--) {
         int phase = findPhase(arguments[i], context);
@@ -232,10 +260,10 @@ void Less::Compile(std::ostream &out, CPContext &context) {
     out << "sub eax, [esp - 8]\n";
     int idx = context.branch_index++;
     out << "jl " << "_set1_" << idx << "\n";
-    out << "mov [esp - 4], 0\n";
+    out << "mov [esp - 4], dword 0\n";
     out << "jmp _setend" << idx << "\n";
     out << "_set1_" << idx << ":\n";
-    out << "mov [esp - 4], 1\n";
+    out << "mov [esp - 4], dword 1\n";
     out << "_setend" << idx << ":\n";
 }
 
@@ -251,10 +279,10 @@ void Equal::Compile(std::ostream &out, CPContext &context) {
     out << "sub eax, [esp - 8]\n";
     int idx = context.branch_index++;
     out << "jz " << "_set1_" << idx << "\n";
-    out << "mov [esp - 4], 0\n";
+    out << "mov [esp - 4], dword 0\n";
     out << "jmp _setend" << idx << "\n";
     out << "_set1_" << idx << ":\n";
-    out << "mov [esp - 4], 1\n";
+    out << "mov [esp - 4], dword 1\n";
     out << "_setend" << idx << ":\n";
 }
 

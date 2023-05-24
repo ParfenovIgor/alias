@@ -1,9 +1,40 @@
 #include <iostream>
+#include <fstream>
 #include "syntax.h"
 #include "exception.h"
 #include "process.h"
 
 namespace Syntax {
+    std::shared_ptr <AST::Block> ProcessProgram(TokenStream &ts) {
+        std::shared_ptr <AST::Block> block = std::make_shared <AST::Block> ();
+        block->line_begin = ts.GetToken().line_begin;
+        block->position_begin = ts.GetToken().position_begin;
+        while(ts.GetToken().type != TokenType::Eof && ts.GetToken().type != TokenType::BraceClose) {
+            if (ts.GetToken().type == TokenType::Include) {
+                std::string filename = ts.GetToken().value_string;
+                std::ifstream fin(filename);
+                if (!fin) {
+                    throw AliasException("Could not open file " + filename, ts.GetToken());
+                }
+                std::shared_ptr <AST::Node> node = Parse(filename);
+                std::shared_ptr <AST::Block> inc_block = std::dynamic_pointer_cast <AST::Block> (node);
+                for (auto inc_statement : inc_block->statement_list) {
+                    block->statement_list.push_back(inc_statement);
+                }
+                ts.NextToken();
+                continue;
+            }
+            std::shared_ptr <AST::Statement> _statement = ProcessStatement(ts);
+            if (_statement) {
+                block->statement_list.push_back(_statement);
+            }
+        }
+        block->line_end = ts.GetToken().line_end;
+        block->position_end = ts.GetToken().position_end;
+        block->filename = ts.GetToken().filename;
+        return block;
+    }
+
     std::shared_ptr <AST::Block> ProcessBlock(TokenStream &ts) {
         std::shared_ptr <AST::Block> block = std::make_shared <AST::Block> ();
         block->line_begin = ts.GetToken().line_begin;
@@ -11,7 +42,12 @@ namespace Syntax {
         ts.NextToken();
         while(ts.GetToken().type != TokenType::Eof && ts.GetToken().type != TokenType::BraceClose) {
             if (ts.GetToken().type == TokenType::Include) {
-                std::shared_ptr <AST::Node> node = Parse(ts.GetToken().value_string);
+                std::string filename = ts.GetToken().value_string;
+                std::ifstream fin(filename);
+                if (!fin) {
+                    throw AliasException("Could not open file " + filename, ts.GetToken());
+                }
+                std::shared_ptr <AST::Node> node = Parse(filename);
                 std::shared_ptr <AST::Block> inc_block = std::dynamic_pointer_cast <AST::Block> (node);
                 for (auto inc_statement : inc_block->statement_list) {
                     block->statement_list.push_back(inc_statement);
@@ -229,6 +265,10 @@ namespace Syntax {
             function_definition->line_begin = ts.GetToken().line_begin;
             function_definition->position_begin = ts.GetToken().position_begin;
             ts.NextToken();
+            if (ts.GetToken().type == TokenType::Caret) {
+                function_definition->external = true;
+                ts.NextToken();
+            }
             if (ts.GetToken().type != TokenType::Identifier) {
                 throw AliasException("Identifier exprected in function definition", ts.GetToken());
             }
@@ -289,6 +329,67 @@ namespace Syntax {
             ts.NextToken();
 
             return function_definition;
+        }
+        if (ts.GetToken().type == TokenType::Proto) {
+            std::shared_ptr <AST::Prototype> prototype = std::make_shared <AST::Prototype> ();
+            prototype->line_begin = ts.GetToken().line_begin;
+            prototype->position_begin = ts.GetToken().position_begin;
+            ts.NextToken();
+            if (ts.GetToken().type != TokenType::Identifier) {
+                throw AliasException("Identifier exprected in function prototype", ts.GetToken());
+            }
+            prototype->name = ts.GetToken().value_string;
+            ts.NextToken();
+            if (ts.GetToken().type != TokenType::ParenthesisOpen) {
+                throw AliasException("( expected in function prototype", ts.GetToken());
+            }
+            ts.NextToken();
+            std::shared_ptr <AST::FunctionSignature> function_signature = std::make_shared <AST::FunctionSignature> ();
+            while (true) {
+                if (ts.GetToken().type != TokenType::Identifier) {
+                    throw AliasException("Idenfier expected in argument list", ts.GetToken());
+                }
+                function_signature->identifiers.push_back(ts.GetToken().value_string);
+                ts.NextToken();
+                if (ts.GetToken().type != TokenType::Int && ts.GetToken().type != TokenType::Ptr) {
+                    throw AliasException("Type expected in argument list", ts.GetToken());
+                }
+                if (ts.GetToken().type == TokenType::Int) {
+                    function_signature->types.push_back(AST::Type::Int);
+                    ts.NextToken();
+                    function_signature->size_in.push_back(0);
+                    function_signature->size_out.push_back(0);
+                }
+                else {
+                    function_signature->types.push_back(AST::Type::Ptr);
+                    ts.NextToken();
+                    if (ts.GetToken().type != TokenType::Integer) {
+                        throw AliasException("Integer expected in pointer argument", ts.GetToken());
+                    }
+                    function_signature->size_in.push_back(ts.GetToken().value_int);
+                    ts.NextToken();
+                    if (ts.GetToken().type != TokenType::Integer) {
+                        throw AliasException("Integer expected in pointer argument", ts.GetToken());
+                    }
+                    function_signature->size_out.push_back(ts.GetToken().value_int);
+                    ts.NextToken();
+                }
+                if (ts.GetToken().type == TokenType::ParenthesisClose) {
+                    ts.NextToken();
+                    break;
+                }
+                if (ts.GetToken().type != TokenType::Comma) {
+                    throw AliasException(", expected in argument list", ts.GetToken());
+                }
+
+                prototype->line_end = ts.GetToken().line_end;
+                prototype->position_end = ts.GetToken().position_end;
+                prototype->filename = ts.GetToken().filename;
+                ts.NextToken();
+            }
+            prototype->signature = function_signature;
+
+            return prototype;
         }
         if (ts.GetToken().type == TokenType::Def) {
             std::shared_ptr <AST::Definition> definition = std::make_shared <AST::Definition> ();
@@ -430,6 +531,6 @@ namespace Syntax {
 
     std::shared_ptr <AST::Node> Process(const std::vector <Token> tokens) {
         TokenStream token_stream(tokens);
-        return ProcessStatement(token_stream);
+        return ProcessProgram(token_stream);
     }
 }

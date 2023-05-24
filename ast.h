@@ -107,6 +107,15 @@ public:
     std::string name;
     std::shared_ptr <FunctionSignature> signature;
     std::shared_ptr <Block> body;
+    bool external;
+    void Validate(VLContext &context);
+    void Compile(std::ostream &out, CPContext &context);
+};
+
+class Prototype : public Statement {
+public:
+    std::string name;
+    std::shared_ptr <FunctionSignature> signature;
     void Validate(VLContext &context);
     void Compile(std::ostream &out, CPContext &context);
 };
