@@ -23,8 +23,8 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
     int line = 0, position = 0;
     for (size_t i = 0; i < str.size();) {
         if (is_reserved_word(str, "asm", i)) {
-            int position_begin = position;
             int line_begin = line;
+            int position_begin = position;
             i += 3;
             position += 3;
             while (i < (int)str.size() && str[i] != '{') {
@@ -58,8 +58,8 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
             i++;
         }
         else if (is_reserved_word(str, "include", i)) {
-            int position_begin = position;
             int line_begin = line;
+            int position_begin = position;
             i += 7;
             position += 7;
             while (i < (int)str.size() && str[i] != '{') {
@@ -256,11 +256,72 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
         }
         else if (i + 1 <= str.size() && str.substr(i, 1) == "\"") {
             i++;
-            int l_line = line;
-            int l_position = position;
+            int line_begin = line;
+            int position_begin = position;
             position++;
-            int l = i;
-            while(i + 1 <= str.size() && str.substr(i, 1) != "\"") {
+            std::string buffer;
+            while (i < (int)str.size() && str[i] != '\"') {
+                if (str[i] == '\\' && i + 1 < str.size()) {
+                    bool found = false;
+                    if (str[i + 1] == '0') {
+                        buffer.push_back((char)0x0);
+                        found = true;
+                    }
+                    if (str[i + 1] == 'a') {
+                        buffer.push_back((char)0x7);
+                        found = true;
+                    }
+                    if (str[i + 1] == 'b') {
+                        buffer.push_back((char)0x8);
+                        found = true;
+                    }
+                    if (str[i + 1] == 'e') {
+                        buffer.push_back((char)0x1B);
+                        found = true;
+                    }
+                    if (str[i + 1] == 'f') {
+                        buffer.push_back((char)0xC);
+                        found = true;
+                    }
+                    if (str[i + 1] == 'n') {
+                        buffer.push_back((char)0xA);
+                        found = true;
+                    }
+                    if (str[i + 1] == 'r') {
+                        buffer.push_back((char)0xD);
+                        found = true;
+                    }
+                    if (str[i + 1] == 't') {
+                        buffer.push_back((char)0x9);
+                        found = true;
+                    }
+                    if (str[i + 1] == 'v') {
+                        buffer.push_back((char)0xB);
+                        found = true;
+                    }
+                    if (str[i + 1] == '\\') {
+                        buffer.push_back((char)0x5C);
+                        found = true;
+                    }
+                    if (str[i + 1] == '\'') {
+                        buffer.push_back((char)0x27);
+                        found = true;
+                    }
+                    if (str[i + 1] == '\"') {
+                        buffer.push_back((char)0x22);
+                        found = true;
+                    }
+                    if (str[i + 1] == '?') {
+                        buffer.push_back((char)0x3F);
+                        found = true;
+                    }
+                    if (found) {
+                        i += 2;
+                        position += 2;
+                        continue;
+                    }
+                }
+                buffer.push_back(str[i]);
                 i++;
                 position++;
                 if (str[i] == '\n') {
@@ -268,10 +329,11 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
                     line++;
                 }
             }
-            if (i == str.size())
-                throw AliasException("Non closed string", l_line, l_position, line, position, filename);
-            int r = i - 1;
-            token_stream.push_back(Token(TokenType::String, str.substr(l, r - l + 1), l_line, l_position, line, position, filename));
+            if (i == (int)str.size()) {
+                throw AliasException("\" expected after string", line_begin, position_begin, line, position, filename);
+            }
+            buffer.push_back('\0');
+            token_stream.push_back(Token(TokenType::String, buffer, line_begin, position_begin, line, position, filename));
             position++;
             i++;
         }

@@ -46,8 +46,8 @@ std::shared_ptr <AST::Node> Parse(std::string filename) {
     return node;
 }
 
-int Process(std::string filename) {
-    std::shared_ptr <AST::Node> node = Parse(filename);
+int Process() {
+    std::shared_ptr <AST::Node> node = Parse(Settings::GetFilename());
 
     try {
         AST::Validate(node);
@@ -63,17 +63,56 @@ int Process(std::string filename) {
         exit(1);
     }
 
+    std::string cmd;
     if (Settings::GetCompile()) {
-        std::string output_filename = Settings::GetOutputFilename();
-        std::ofstream file(output_filename + ".asm");
+        std::string filename = Settings::GetFilename();
+        for (int i = 0; i < (int)filename.size(); i++) {
+            if (filename[i] == '.') {
+                filename = filename.substr(0, i);
+                break;
+            }
+        }
+
+        std::ofstream file(filename + ".asm");
         AST::Compile(node, file);
         file.close();
-        
-        if (Settings::GetLink()){
-            std::string cmd = "nasm -f elf32 " + output_filename + ".asm -o " + output_filename + ".o";
+        if (Settings::GetAssemble()) {
+            cmd = "nasm -f elf32 " + filename + ".asm -o " + filename + ".o";
             system(cmd.c_str());
-            cmd = "gcc -m32 " + output_filename + ".o -no-pie -o " + output_filename;
-            system(cmd.c_str());
+
+            if (Settings::GetLink()) {
+                cmd = "gcc -m32 " + filename + ".o -no-pie -o " + filename;
+                system(cmd.c_str());
+
+                cmd = "rm " + filename + ".asm";
+                system(cmd.c_str());
+
+                cmd = "rm " + filename + ".o";
+                system(cmd.c_str());
+
+                std::string output_filename = Settings::GetOutputFilename();
+                if (!output_filename.empty()) {
+                    cmd = "mv " + filename + " " + output_filename;
+                    system(cmd.c_str());
+                }
+            }
+            else {
+                cmd = "rm " + filename + ".asm";
+                system(cmd.c_str());
+                
+                std::string output_filename = Settings::GetOutputFilename();
+                if (!output_filename.empty()) {
+                    cmd = "mv " + filename + ".o " + output_filename;
+                    system(cmd.c_str());
+                }
+            }
+        }
+        else {
+            std::string output_filename = Settings::GetOutputFilename();
+            if (!output_filename.empty()) {
+                cmd = "mv " + filename + ".asm " + output_filename;
+                system(cmd.c_str());
+            }
         }
     }
 

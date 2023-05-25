@@ -514,16 +514,30 @@ namespace Syntax {
             }
 
             if (ts.GetToken().type == TokenType::Move) {
-                std::shared_ptr <AST::Movement> movement = std::make_shared <AST::Movement> ();
-                movement->line_begin = line_begin;
-                movement->position_begin = position_begin;
-                movement->identifier = identifier;
                 ts.NextToken();
-                movement->value = ProcessExpression(ts);
-                movement->line_end = movement->value->line_end;
-                movement->position_end = movement->value->position_end;
-                movement->filename = movement->value->filename;
-                return movement;
+                if (ts.GetToken().type == TokenType::String) {
+                    std::shared_ptr <AST::MovementString> movement_string = std::make_shared <AST::MovementString> ();
+                    movement_string->line_begin = line_begin;
+                    movement_string->position_begin = position_begin;
+                    movement_string->identifier = identifier;
+                    movement_string->line_end = ts.GetToken().line_end;
+                    movement_string->position_end = ts.GetToken().position_end;
+                    movement_string->filename = ts.GetToken().filename;
+                    movement_string->value = ts.GetToken().value_string;
+                    ts.NextToken();
+                    return movement_string;
+                }
+                else {
+                    std::shared_ptr <AST::Movement> movement = std::make_shared <AST::Movement> ();
+                    movement->line_begin = line_begin;
+                    movement->position_begin = position_begin;
+                    movement->identifier = identifier;
+                    movement->value = ProcessExpression(ts);
+                    movement->line_end = movement->value->line_end;
+                    movement->position_end = movement->value->position_end;
+                    movement->filename = movement->value->filename;
+                    return movement;
+                }
             }
         }
         throw AliasException("Statement expected", ts.GetToken());

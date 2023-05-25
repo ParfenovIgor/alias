@@ -350,6 +350,23 @@ void Movement::Validate(VLContext &context) {
     value->Validate(context);
 }
 
+void MovementString::Validate(VLContext &context) {
+    if (getVariableType(identifier, this, context) == Type::Ptr) {
+        int index = getVariableIndex(identifier, this, context);
+        int length = ((int)value.size() + 3) / 4;
+        for (State state : context.states) {
+            if (state.heap[index].first == -1 ||
+                state.heap[index].second < 0 ||
+                state.heap[index].second + length - 1 >= context.packet_size[state.heap[index].first]) {
+                throw AliasException("Access violation", this);
+            }
+        }
+    }
+    else {
+        throw AliasException("Pointer expected in left part of movement", this);
+    }
+}
+
 void Assumption::Validate(VLContext &context) {
     if (auto _equal = std::dynamic_pointer_cast <AST::Equal> (condition)) {
         auto _expression1 = _equal -> left;

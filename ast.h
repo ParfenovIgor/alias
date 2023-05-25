@@ -144,6 +144,14 @@ public:
     void Compile(std::ostream &out, CPContext &context);
 };
 
+class MovementString : public Statement {
+public:
+    std::string identifier;
+    std::string value;
+    void Validate(VLContext &context);
+    void Compile(std::ostream &out, CPContext &context);
+};
+
 class Assumption : public Statement {
 public:
     std::shared_ptr <Expression> condition;

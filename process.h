@@ -5,6 +5,6 @@
 #include "ast.h"
 
 std::shared_ptr <AST::Node> Parse(std::string filename);
-int Process(std::string filename);
+int Process();
 
 #endif // PROCESS_H_INCLUDED

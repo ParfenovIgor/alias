@@ -1,6 +1,7 @@
 #include <iostream>
 #include "ast.h"
 #include "compile.h"
+#include "settings.h"
 
 namespace AST {
 
@@ -49,7 +50,9 @@ void Compile(std::shared_ptr <Node> node, std::ostream &out) {
     out << "extern malloc\n";
     out << "extern free\n";
     out << "section .text\n";
-    out << "main:\n";
+    if (!Settings::GetNoMain()) {
+        out << "main:\n";
+    }
     out << "push ebp\n";
     out << "mov ebp, esp\n";
     CPContext context;
@@ -173,6 +176,29 @@ void Movement::Compile(std::ostream &out, CPContext &context) {
     out << "mov eax, [esp - 4]\n";
     out << "mov ebx, [ebp + " << phase << "]\n";
     out << "mov [ebx], eax\n";
+}
+
+void MovementString::Compile(std::ostream &out, CPContext &context) {
+    out << "; movement string\n";
+    int idx = context.branch_index;
+    context.branch_index++;
+    out << "jmp _strbufend" << idx << "\n";
+    out << "_strbuf" << idx << " db ";
+    for (int i = 0; i < (int)value.size(); i++) {
+        out << (int)value[i];
+        if (i + 1 != (int)value.size()) {
+            out << ",";
+        }
+        else {
+            out << "\n";
+        }
+    }
+    out << "_strbufend" << idx << ":\n";
+    out << "mov esi, _strbuf" << idx << "\n";
+    int phase = findPhase(identifier, context);
+    out << "mov edi, [ebp + " << phase << "]\n";
+    out << "mov ecx, " << (int)value.size() << "\n";
+    out << "rep movsb\n";
 }
 
 void Assumption::Compile(std::ostream &out, CPContext &context) {
