@@ -154,7 +154,9 @@ public:
 
 class Assumption : public Statement {
 public:
-    std::shared_ptr <Expression> condition;
+    std::string identifier;
+    int left, right;
+    std::shared_ptr <Statement> statement;
     void Validate(VLContext &context);
     void Compile(std::ostream &out, CPContext &context);
 };
@@ -206,6 +208,20 @@ public:
 };
 
 class Addition : public Expression {
+public:
+    std::shared_ptr <Expression> left, right;
+    void Validate(VLContext &context);
+    void Compile(std::ostream &out, CPContext &context);
+};
+
+class Subtraction : public Expression {
+public:
+    std::shared_ptr <Expression> left, right;
+    void Validate(VLContext &context);
+    void Compile(std::ostream &out, CPContext &context);
+};
+
+class Multiplication : public Expression {
 public:
     std::shared_ptr <Expression> left, right;
     void Validate(VLContext &context);

@@ -1,20 +1,20 @@
 #include "settings.h"
 
 namespace Settings {
-    bool Server = false;
+    bool States = false;
     bool Compile = false;
     bool Assemble = false;
     bool Link = false;
-    bool NoMain = false;
+    bool TopMain = false;
     std::string Filename;
     std::string OutputFilename;
 
-    bool GetServer() {
-        return Server;
+    bool GetStates() {
+        return States;
     }
 
-    void SetServer(bool state) {
-        Server = state;
+    void SetStates(bool state) {
+        States = state;
     }
 
     bool GetCompile() {
@@ -41,12 +41,12 @@ namespace Settings {
         Link = state;
     }
 
-    bool GetNoMain() {
-        return NoMain;
+    bool GetTopMain() {
+        return TopMain;
     }
 
-    void SetNoMain(bool state) {
-        NoMain = state;
+    void SetTopMain(bool state) {
+        TopMain = state;
     }
 
     std::string GetFilename() {

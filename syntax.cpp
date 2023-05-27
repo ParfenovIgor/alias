@@ -84,18 +84,31 @@ namespace Syntax {
             _addition->filename = _expression1->filename;
             return _addition;
         }
-        if (ts.GetToken().type == TokenType::Equal) {
+        if (ts.GetToken().type == TokenType::Minus) {
             ts.NextToken();
             std::shared_ptr <AST::Expression> _expression2 = ProcessExpression(ts);
-            std::shared_ptr <AST::Equal> _equal = std::make_shared <AST::Equal> ();
-            _equal->left = _expression1;
-            _equal->right = _expression2;
-            _equal->line_begin = _expression1->line_begin;
-            _equal->position_begin = _expression1->position_begin;
-            _equal->line_end= _expression2->line_end;
-            _equal->position_end= _expression2->position_end;
-            _equal->filename = _expression1->filename;
-            return _equal;
+            std::shared_ptr <AST::Subtraction> _subtraction = std::make_shared <AST::Subtraction> ();
+            _subtraction->left = _expression1;
+            _subtraction->right = _expression2;
+            _subtraction->line_begin = _expression1->line_begin;
+            _subtraction->position_begin = _expression1->position_begin;
+            _subtraction->line_end= _expression2->line_end;
+            _subtraction->position_end= _expression2->position_end;
+            _subtraction->filename = _expression1->filename;
+            return _subtraction;
+        }
+        if (ts.GetToken().type == TokenType::Mult) {
+            ts.NextToken();
+            std::shared_ptr <AST::Expression> _expression2 = ProcessExpression(ts);
+            std::shared_ptr <AST::Multiplication> _multiplication = std::make_shared <AST::Multiplication> ();
+            _multiplication->left = _expression1;
+            _multiplication->right = _expression2;
+            _multiplication->line_begin = _expression1->line_begin;
+            _multiplication->position_begin = _expression1->position_begin;
+            _multiplication->line_end= _expression2->line_end;
+            _multiplication->position_end= _expression2->position_end;
+            _multiplication->filename = _expression1->filename;
+            return _multiplication;
         }
         if (ts.GetToken().type == TokenType::Less) {
             ts.NextToken();
@@ -109,6 +122,19 @@ namespace Syntax {
             _less->position_end= _expression2->position_end;
             _less->filename = _expression1->filename;
             return _less;
+        }
+        if (ts.GetToken().type == TokenType::Equal) {
+            ts.NextToken();
+            std::shared_ptr <AST::Expression> _expression2 = ProcessExpression(ts);
+            std::shared_ptr <AST::Equal> _equal = std::make_shared <AST::Equal> ();
+            _equal->left = _expression1;
+            _equal->right = _expression2;
+            _equal->line_begin = _expression1->line_begin;
+            _equal->position_begin = _expression1->position_begin;
+            _equal->line_end= _expression2->line_end;
+            _equal->position_end= _expression2->position_end;
+            _equal->filename = _expression1->filename;
+            return _equal;
         }
         return _expression1;
     }
@@ -280,6 +306,10 @@ namespace Syntax {
             ts.NextToken();
             std::shared_ptr <AST::FunctionSignature> function_signature = std::make_shared <AST::FunctionSignature> ();
             while (true) {
+                if (ts.GetToken().type == TokenType::ParenthesisClose) {
+                    ts.NextToken();
+                    break;
+                }
                 if (ts.GetToken().type != TokenType::Identifier) {
                     throw AliasException("Idenfier expected in argument list", ts.GetToken());
                 }
@@ -346,6 +376,9 @@ namespace Syntax {
             ts.NextToken();
             std::shared_ptr <AST::FunctionSignature> function_signature = std::make_shared <AST::FunctionSignature> ();
             while (true) {
+                if (ts.GetToken().type == TokenType::ParenthesisClose) {
+                    break;
+                }
                 if (ts.GetToken().type != TokenType::Identifier) {
                     throw AliasException("Idenfier expected in argument list", ts.GetToken());
                 }
@@ -375,19 +408,18 @@ namespace Syntax {
                     ts.NextToken();
                 }
                 if (ts.GetToken().type == TokenType::ParenthesisClose) {
-                    ts.NextToken();
                     break;
                 }
                 if (ts.GetToken().type != TokenType::Comma) {
                     throw AliasException(", expected in argument list", ts.GetToken());
                 }
-
-                prototype->line_end = ts.GetToken().line_end;
-                prototype->position_end = ts.GetToken().position_end;
-                prototype->filename = ts.GetToken().filename;
                 ts.NextToken();
             }
-            prototype->signature = function_signature;
+            prototype->signature = function_signature;                    
+            prototype->line_end = ts.GetToken().line_end;
+            prototype->position_end = ts.GetToken().position_end;
+            prototype->filename = ts.GetToken().filename;
+            ts.NextToken();
 
             return prototype;
         }
@@ -425,14 +457,30 @@ namespace Syntax {
                 throw AliasException("( expected in assume condition", ts.GetToken());
             }
             ts.NextToken();
-            _assumption->condition = ProcessExpression(ts);
+            if (ts.GetToken().type != TokenType::Identifier) {
+                throw AliasException("Identifier expected in assume condition", ts.GetToken());
+            }
+            _assumption->identifier = ts.GetToken().value_string;
+            ts.NextToken();
+            if (ts.GetToken().type != TokenType::Integer) {
+                throw AliasException("Integer expected in assume condition", ts.GetToken());
+            }
+            _assumption->left = ts.GetToken().value_int;
+            ts.NextToken();
+            if (ts.GetToken().type != TokenType::Integer) {
+                throw AliasException("Integer expected in assume condition", ts.GetToken());
+            }
+            _assumption->right = ts.GetToken().value_int;
+            ts.NextToken();
             if (ts.GetToken().type != TokenType::ParenthesisClose) {
                 throw AliasException(") expected in assume condition", ts.GetToken());
             }
-            _assumption->line_end = ts.GetToken().line_end;
-            _assumption->position_end = ts.GetToken().position_end;
-            _assumption->filename = ts.GetToken().filename;
             ts.NextToken();
+            std::shared_ptr <AST::Statement> _statement = ProcessStatement(ts);
+            _assumption->statement = _statement;
+            _assumption->line_end = _statement->line_end;
+            _assumption->position_end = _statement->position_end;
+            _assumption->filename = _statement->filename;
             return _assumption;
         }
         if (ts.GetToken().type == TokenType::Free) {
@@ -470,6 +518,9 @@ namespace Syntax {
             }
             ts.NextToken();
             while (true) {
+                if (ts.GetToken().type == TokenType::ParenthesisClose) {
+                    break;
+                }
                 if (ts.GetToken().type == TokenType::Identifier) {
                     function_call->arguments.push_back(ts.GetToken().value_string);
                 }

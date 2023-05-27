@@ -50,7 +50,7 @@ void Compile(std::shared_ptr <Node> node, std::ostream &out) {
     out << "extern malloc\n";
     out << "extern free\n";
     out << "section .text\n";
-    if (!Settings::GetNoMain()) {
+    if (Settings::GetTopMain()) {
         out << "main:\n";
     }
     out << "push ebp\n";
@@ -202,6 +202,48 @@ void MovementString::Compile(std::ostream &out, CPContext &context) {
 }
 
 void Assumption::Compile(std::ostream &out, CPContext &context) {
+    out << "; assumption\n";
+
+    int ind_error = context.branch_index++;
+    out << "jmp aftererror" << ind_error << "\n";
+    std::string error = "Assumption fault in file " + filename + " on line " + std::to_string(line_begin + 1) + " position " + std::to_string(position_begin + 1);
+    out << "error" << ind_error << " db \"" << error << "\", 0xA\n";
+    out << "aftererror" << ind_error << ":\n";
+
+    int phase = findPhase(identifier, context);
+    int idx = context.branch_index++;
+    out << "mov eax, [ebp + " << phase << "]\n";
+    out << "sub eax, " << left << "\n";
+    out << "jl " << "_set1_" << idx << "\n";
+    out << "jmp _setend" << idx << "\n";
+    out << "_set1_" << idx << ":\n";
+    out << "mov eax, 4\n";
+    out << "mov ebx, 1\n";
+    out << "mov ecx, error" << ind_error << "\n";
+    out << "mov edx, " << error.size() + 1 << "\n";
+    out << "int 0x80\n";
+    out << "mov eax, 1\n";
+    out << "mov ebx, 1\n";
+    out << "int 0x80\n";
+    out << "_setend" << idx << ":\n";
+
+    idx = context.branch_index++;
+    out << "mov eax, " << right << "\n";
+    out << "sub eax, [ebp + " << phase << "]\n";
+    out << "jl " << "_set1_" << idx << "\n";
+    out << "jmp _setend" << idx << "\n";
+    out << "_set1_" << idx << ":\n";
+    out << "mov eax, 4\n";
+    out << "mov ebx, 1\n";
+    out << "mov ecx, error" << ind_error << "\n";
+    out << "mov edx, " << error.size() + 1 << "\n";
+    out << "int 0x80\n";
+    out << "mov eax, 1\n";
+    out << "mov ebx, 1\n";
+    out << "int 0x80\n";
+    out << "_setend" << idx << ":\n";
+
+    statement->Compile(out, context);
 }
 
 void Identifier::Compile(std::ostream &out, CPContext &context) {
@@ -271,6 +313,33 @@ void Addition::Compile(std::ostream &out, CPContext &context) {
     context.variable_stack.pop_back();
     out << "mov eax, [esp - 4]\n";
     out << "add eax, [esp - 8]\n";
+    out << "mov [esp - 4], eax\n";
+}
+
+void Subtraction::Compile(std::ostream &out, CPContext &context) {
+    out << "; subtraction\n";
+    left->Compile(out, context);
+    out << "sub esp, 4\n";
+    context.variable_stack.push_back("__junk");
+    right->Compile(out, context);
+    out << "add esp, 4\n";
+    context.variable_stack.pop_back();
+    out << "mov eax, [esp - 4]\n";
+    out << "sub eax, [esp - 8]\n";
+    out << "mov [esp - 4], eax\n";
+}
+
+void Multiplication::Compile(std::ostream &out, CPContext &context) {
+    out << "; multiplication\n";
+    left->Compile(out, context);
+    out << "sub esp, 4\n";
+    context.variable_stack.push_back("__junk");
+    right->Compile(out, context);
+    out << "add esp, 4\n";
+    context.variable_stack.pop_back();
+    out << "mov eax, [esp - 4]\n";
+    out << "mov edx, [esp - 8]\n";
+    out << "mul edx\n";
     out << "mov [esp - 4], eax\n";
 }
 

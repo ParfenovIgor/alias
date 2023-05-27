@@ -51,7 +51,7 @@ int Process() {
 
     try {
         AST::Validate(node);
-        if (Settings::GetServer()) {
+        if (Settings::GetStates()) {
             AST::PrintStatesLog();
         }
     }
@@ -64,7 +64,7 @@ int Process() {
     }
 
     std::string cmd;
-    if (Settings::GetCompile()) {
+    if (Settings::GetCompile() || Settings::GetAssemble() || Settings::GetLink()) {
         std::string filename = Settings::GetFilename();
         for (int i = 0; i < (int)filename.size(); i++) {
             if (filename[i] == '.') {
@@ -76,7 +76,7 @@ int Process() {
         std::ofstream file(filename + ".asm");
         AST::Compile(node, file);
         file.close();
-        if (Settings::GetAssemble()) {
+        if (Settings::GetAssemble() || Settings::GetLink()) {
             cmd = "nasm -f elf32 " + filename + ".asm -o " + filename + ".o";
             system(cmd.c_str());
 
@@ -91,7 +91,7 @@ int Process() {
                 system(cmd.c_str());
 
                 std::string output_filename = Settings::GetOutputFilename();
-                if (!output_filename.empty()) {
+                if (!output_filename.empty() && filename != output_filename) {
                     cmd = "mv " + filename + " " + output_filename;
                     system(cmd.c_str());
                 }
@@ -101,7 +101,7 @@ int Process() {
                 system(cmd.c_str());
                 
                 std::string output_filename = Settings::GetOutputFilename();
-                if (!output_filename.empty()) {
+                if (!output_filename.empty() && filename + ".o" != output_filename) {
                     cmd = "mv " + filename + ".o " + output_filename;
                     system(cmd.c_str());
                 }
@@ -109,7 +109,7 @@ int Process() {
         }
         else {
             std::string output_filename = Settings::GetOutputFilename();
-            if (!output_filename.empty()) {
+            if (!output_filename.empty() && filename + ".asm" != output_filename) {
                 cmd = "mv " + filename + ".asm " + output_filename;
                 system(cmd.c_str());
             }

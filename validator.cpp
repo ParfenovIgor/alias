@@ -285,7 +285,7 @@ void Assignment::Validate(VLContext &context) {
                 throw AliasException("Identifier expected in left part of addition in right part of assignment", this);
             }
             if (!_integer) {
-                throw AliasException("Integer expected in right part of addition in right part of assignment", this);
+                throw AliasException("Integer variable expected in right part of addition in right part of assignment", this);
             }
             if (getVariableType(_identifier->identifier, this, context) == Type::Ptr) {
                 int index1 = getVariableIndex(identifier, this, context);
@@ -301,18 +301,14 @@ void Assignment::Validate(VLContext &context) {
                     _states.insert(state);
                 }
                 context.states = _states;
+                _integer->value *= 4;
             }
             else {
                 int index = getVariableIndex(identifier, this, context);
                 std::set <State> _states;
                 for (State state : context.states) {
-                    for (int i = -1; i < (int)context.packet_size.size(); i++) {
-                        for (int j = 0; j < ((i == -1) ? 1 : context.packet_size[i]); j++) {
-                            State _state = state;
-                            _state.heap[index] = {i, j};
-                            _states.insert(_state);
-                        }
-                    }
+                    state.heap[index] = {-1, 0};
+                    _states.insert(state);
                 }
                 context.states = _states;
             }
@@ -345,7 +341,7 @@ void Movement::Validate(VLContext &context) {
         }
     }
     else {
-        throw AliasException("Pointer expected in left part of movement", this);
+        throw AliasException("Pointer variable expected in left part of movement", this);
     }
     value->Validate(context);
 }
@@ -363,75 +359,66 @@ void MovementString::Validate(VLContext &context) {
         }
     }
     else {
-        throw AliasException("Pointer expected in left part of movement", this);
+        throw AliasException("Pointer variable expected in left part of movement", this);
     }
 }
 
 void Assumption::Validate(VLContext &context) {
-    if (auto _equal = std::dynamic_pointer_cast <AST::Equal> (condition)) {
-        auto _expression1 = _equal -> left;
-        auto _expression2 = _equal -> right;
-        auto _identifier1 = std::dynamic_pointer_cast <AST::Identifier> (_equal->left);
-        auto _addition = std::dynamic_pointer_cast <AST::Addition> (_equal->right);
-        if (!_identifier1) {
-            throw AliasException("Identifier expected in left part of equality of assumption", this);
-        }
-        if (!_addition) {
-            throw AliasException("Addition expected in right part of equality of assumption", this);
-        }
-        auto _identifier2 = std::dynamic_pointer_cast <AST::Identifier> (_addition->left);
-        auto _integer = std::dynamic_pointer_cast <AST::Integer> (_addition->right);
-        if (!_identifier2) {
-            throw AliasException("Identifier expected in left part of addition in right part of equality of assumption", this);
-        }
-        if (!_integer) {
-            throw AliasException("Integer expected in right part of addition in right part of equality of assumption", this);
-        }
-
-        int index1 = getVariableIndex(_identifier1->identifier, this, context);
-        int index2 = getVariableIndex(_identifier2->identifier, this, context);
-        std::set <State> _states;
-        for (State state : context.states) {
-            if (state.heap[index1].first == state.heap[index2].first &&
-                state.heap[index1].second - state.heap[index2].second == _integer->value) {
-                _states.insert(state);
+    if (auto _assignment = std::dynamic_pointer_cast <AST::Assignment> (statement)) {
+        std::string identifier1 = _assignment->identifier;
+        if (auto _addition = std::dynamic_pointer_cast <AST::Addition> (_assignment->value)) {
+            auto _identifier2 = std::dynamic_pointer_cast <AST::Identifier> (_addition->left);
+            auto _identifier3 = std::dynamic_pointer_cast <AST::Identifier> (_addition->right);
+            if (getVariableType(identifier, this, context) == Type::Ptr) {
+                throw AliasException("Integer variable expected in assumption", this);
             }
-        }
-        context.states = _states;
-    }
-    else if (auto _less = std::dynamic_pointer_cast <AST::Less> (condition)) {
-        auto _expression1 = _less -> left;
-        auto _expression2 = _less -> right;
-        auto _identifier1 = std::dynamic_pointer_cast <AST::Identifier> (_less->left);
-        auto _addition = std::dynamic_pointer_cast <AST::Addition> (_less->right);
-        if (!_identifier1) {
-            throw AliasException("Identifier expected in left part of less of assumption", this);
-        }
-        if (!_addition) {
-            throw AliasException("Addition expected in right part of less of assumption", this);
-        }
-        auto _identifier2 = std::dynamic_pointer_cast <AST::Identifier> (_addition->left);
-        auto _integer = std::dynamic_pointer_cast <AST::Integer> (_addition->right);
-        if (!_identifier2) {
-            throw AliasException("Identifier expected in left part of addition in right part of less of assumption", this);
-        }
-        if (!_integer) {
-            throw AliasException("Integer expected in right part of addition in right part of less of assumption", this);
-        }
-
-        int index1 = getVariableIndex(_identifier1->identifier, this, context);
-        int index2 = getVariableIndex(_identifier2->identifier, this, context);
-        std::set <State> _states;
-        for (State state : context.states) {
-            if (state.heap[index1].first == state.heap[index2].first &&
-                state.heap[index1].second - state.heap[index2].second < _integer->value) {
-                _states.insert(state);
+            if (getVariableType(identifier1, this, context) == Type::Int) {
+                throw AliasException("Pointer variable expected in left part of assignment", this);
             }
+            if (!_identifier2 || getVariableType(_identifier2->identifier, this, context) == Type::Int) {
+                throw AliasException("Pointer variable expected in left part of addition in right part of assignment", this);
+            }
+            if (!_identifier3 || getVariableType(_identifier3->identifier, this, context) == Type::Ptr) {
+                throw AliasException("Integer variable expected in right part of addition in right part of assignment", this);
+            }
+            std::string identifier2 = _identifier2->identifier;
+            std::string identifier3 = _identifier3->identifier;
+            if (identifier != identifier3) {
+                throw AliasException("Right part of addition in right part of assumption is not defined", this);
+            }
+
+            int index1 = getVariableIndex(identifier1, this, context);
+            int index2 = getVariableIndex(identifier2, this, context);
+            std::set <State> _states;
+            for (State state : context.states) {
+                if (state.heap[index2].first == -1) {
+                    state.heap[index1] = {-1, 0};
+                    _states.insert(state);
+                }
+                else {
+                    state.heap[index1] = {state.heap[index2].first, state.heap[index2].second + left};
+                    _states.insert(state);
+                    state.heap[index1] = {state.heap[index2].first, state.heap[index2].second + right};
+                    _states.insert(state);
+                }
+            }
+            context.states = _states;
+
+            auto _multiplication = std::make_shared <AST::Multiplication> ();
+            _addition->right = _multiplication;
+            auto _identifier = std::make_shared <AST::Identifier> ();
+            _identifier->identifier = identifier3;
+            _multiplication->left = _identifier;
+            auto _integer  = std::make_shared <AST::Integer> ();
+            _integer->value = 4;
+            _multiplication->right = _integer;
         }
-        context.states = _states;
+        else {
+            throw AliasException("Addition expected in right part of assignment", this);
+        }
     }
     else {
-        throw AliasException("Equation expected in assumption", this);
+        throw AliasException("Assignment expected in assumption", this);
     }
 }
 
@@ -563,7 +550,7 @@ void Dereference::Validate(VLContext &context) {
             }
         }
         else {
-            throw AliasException("Dereference operator has to be applied to pointer", this);
+            throw AliasException("Dereference operator has to be applied to pointer variable", this);
         }
     }
     else {
@@ -572,6 +559,16 @@ void Dereference::Validate(VLContext &context) {
 }
 
 void Addition::Validate(VLContext &context) {
+    left->Validate(context);
+    right->Validate(context);
+}
+
+void Subtraction::Validate(VLContext &context) {
+    left->Validate(context);
+    right->Validate(context);
+}
+
+void Multiplication::Validate(VLContext &context) {
     left->Validate(context);
     right->Validate(context);
 }

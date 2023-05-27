@@ -28,6 +28,7 @@ enum class TokenType {
     Caret,
     Plus,
     Minus,
+    Mult,
     Less,
     Equal,
     Alloc,
