@@ -43,6 +43,138 @@ std::shared_ptr <FunctionSignature> getFunctionSignature(std::string id, Node *n
     throw AliasException("Identifier was not declared in this scope", node);
 }
 
+FunctionDefinition* getFunctionPointer(std::string id, Node *node, VLContext &context) {
+    for (int i = (int)context.function_stack.size() - 1; i >= 0; i--) {
+        if (context.function_stack[i] == id) {
+            return context.function_pointer_stack[i];
+        }
+    }
+    throw AliasException("Identifier was not declared in this scope", node);
+}
+
+int EvaluateExpression(std::shared_ptr <Expression> expression, VLContext context) {
+    if (auto _identifier = std::dynamic_pointer_cast <AST::Identifier> (expression)) {
+        for (std::pair <std::string,int> p : context.metavariable_stack) {
+            if (p.first == _identifier->identifier) {
+                return p.second;
+            }
+        }
+        throw AliasException("Metavariable was not defined", expression.get());
+    }
+    if (auto _integer = std::dynamic_pointer_cast <AST::Integer> (expression)) {
+        return _integer->value;
+    }
+    if (auto _addition = std::dynamic_pointer_cast <AST::Addition> (expression)) {
+        int left = EvaluateExpression(_addition->left, context);
+        int right = EvaluateExpression(_addition->right, context);
+        return left + right;
+    }
+    if (auto _subtraction = std::dynamic_pointer_cast <AST::Subtraction> (expression)) {
+        int left = EvaluateExpression(_subtraction->left, context);
+        int right = EvaluateExpression(_subtraction->right, context);
+        return left - right;
+    }
+    if (auto _multiplication = std::dynamic_pointer_cast <AST::Multiplication> (expression)) {
+        int left = EvaluateExpression(_multiplication->left, context);
+        int right = EvaluateExpression(_multiplication->right, context);
+        return left * right;
+    }
+    throw AliasException("Expression can not be evaluated", expression.get());
+}
+
+std::shared_ptr <FunctionSignatureEvaluated> EvaluateFunctionSignature(std::shared_ptr <FunctionSignature> signature, VLContext context) {
+    std::shared_ptr <FunctionSignatureEvaluated> _signature = std::make_shared <FunctionSignatureEvaluated> ();
+    _signature->identifiers = signature->identifiers;
+    _signature->types = signature->types;
+    for (auto expr : signature->size_in) {
+        if (expr) {
+            _signature->size_in.push_back(EvaluateExpression(expr, context));
+        }
+        else {
+            _signature->size_in.push_back(0);
+        }
+    }
+    for (auto expr : signature->size_out) {
+        if (expr) {
+            _signature->size_out.push_back(EvaluateExpression(expr, context));
+        }
+        else {
+            _signature->size_out.push_back(0);
+        }
+    }
+    return _signature;
+}
+
+void ValidateFunctionDefinition(FunctionDefinition &function, VLContext &context) {
+    VLContext _context = context;
+    context = VLContext();
+    context.function_stack = _context.function_stack;
+    context.function_signature_stack = _context.function_signature_stack;
+    context.function_pointer_stack = _context.function_pointer_stack;
+    context.metavariable_stack = _context.metavariable_stack;
+
+    std::shared_ptr <FunctionSignatureEvaluated> signature = EvaluateFunctionSignature(function.signature, context);
+    int n = (int)signature->identifiers.size();
+    State state;
+    for (int i = 0; i < n; i++) {
+        if (signature->types[i] == Type::Ptr) {
+            if (signature->size_in[i] == 0)
+                state.heap.push_back({-1, 0});
+            else {
+                state.heap.push_back({(int)context.packet_size.size(), 0});
+                context.packet_size.push_back(signature->size_in[i]);
+            }
+        }
+        else {
+            state.heap.push_back({-1, 0});
+        }
+    }
+    context.states.insert(state);
+
+    for (int i = 0; i < n; i++) {
+        context.variable_stack.push_back(signature->identifiers[i]);
+        context.variable_type_stack.push_back(signature->types[i]);
+    }
+
+    function.body->Validate(context);
+
+    std::vector <int> packet_num(n, -2);
+    for (State state : context.states) {
+        for (int i = 0; i < n; i++) {
+            if (signature->types[i] == Type::Int) continue;
+            if (signature->size_out[i] == 0) {
+                packet_num[i] = -1;
+                if (state.heap[i].first != -1) {
+                    throw AliasException("Function post condition failed", &function);
+                }
+            }
+            else {
+                if (state.heap[i].first == -1 || state.heap[i].second != 0 || context.packet_size[state.heap[i].second] < signature->size_out[i]) {
+                    throw AliasException("Function post condition failed", &function);
+                }
+                if (packet_num[i] == -2) {
+                    packet_num[i] = state.heap[i].first;
+                }
+                else if (state.heap[i].first != packet_num[i]) {
+                    throw AliasException("Function post condition has several packets", &function);
+                }
+            }
+        }
+    }
+    for (int i : packet_num) {
+        if (i >= 0) {
+            context.packet_size[i] = 0;
+        }
+    }
+    for (int i : context.packet_size) {
+        if (i != 0) {
+            throw AliasException("Memory leak", &function);
+        }
+    }
+
+    context = _context;
+}
+
 void printStates(std::set <State> states) {
     std::cout << "{" << std::endl;
     for (State state : states) {
@@ -114,6 +246,7 @@ void Block::Validate(VLContext &context) {
     while (context.function_stack.size() > old_function_stack_size) {
         context.function_stack.pop_back();
         context.function_signature_stack.pop_back();
+        context.function_pointer_stack.pop_back();
     }
 }
 
@@ -179,79 +312,19 @@ void While::Validate(VLContext &context) {
 }
 
 void FunctionDefinition::Validate(VLContext &context) {
-    VLContext _context = context;
-    context = VLContext();
-    context.function_stack = _context.function_stack;
-    context.function_signature_stack = _context.function_signature_stack;
-
-    int n = (int)signature->identifiers.size();
-    State state;
-    for (int i = 0; i < n; i++) {
-        if (signature->types[i] == Type::Ptr) {
-            if (signature->size_in[i] == 0)
-                state.heap.push_back({-1, 0});
-            else {
-                state.heap.push_back({(int)context.packet_size.size(), 0});
-                context.packet_size.push_back(signature->size_in[i]);
-            }
-        }
-        else {
-            state.heap.push_back({-1, 0});
-        }
-    }
-    context.states.insert(state);
-
-    for (int i = 0; i < n; i++) {
-        context.variable_stack.push_back(signature->identifiers[i]);
-        context.variable_type_stack.push_back(signature->types[i]);
-    }
-
     context.function_stack.push_back(name);
     context.function_signature_stack.push_back(signature);
-    body->Validate(context);
+    context.function_pointer_stack.push_back(this);
 
-    std::vector <int> packet_num(n, -2);
-    for (State state : context.states) {
-        for (int i = 0; i < n; i++) {
-            if (signature->types[i] == Type::Int) continue;
-            if (signature->size_out[i] == 0) {
-                packet_num[i] = -1;
-                if (state.heap[i].first != -1) {
-                    throw AliasException("Function post condition failed", this);
-                }
-            }
-            else {
-                if (state.heap[i].first == -1 || state.heap[i].second != 0 || context.packet_size[state.heap[i].second] < signature->size_out[i]) {
-                    throw AliasException("Function post condition failed", this);
-                }
-                if (packet_num[i] == -2) {
-                    packet_num[i] = state.heap[i].first;
-                }
-                else if (state.heap[i].first != packet_num[i]) {
-                    throw AliasException("Function post condition has several packets", this);
-                }
-            }
-        }
+    if (name == "main" && external) {
+        ValidateFunctionDefinition(*this, context);
     }
-    for (int i : packet_num) {
-        if (i >= 0) {
-            context.packet_size[i] = 0;
-        }
-    }
-    for (int i : context.packet_size) {
-        if (i != 0) {
-            throw AliasException("Memory leak", this);
-        }
-    }
-
-    context = _context;
-    context.function_stack.push_back(name);
-    context.function_signature_stack.push_back(signature);
 }
 
 void Prototype::Validate(VLContext &context) {
     context.function_stack.push_back(name);
     context.function_signature_stack.push_back(signature);
+    context.function_pointer_stack.push_back(nullptr);
 }
 
 void Definition::Validate(VLContext &context) {
@@ -276,7 +349,7 @@ void Assignment::Validate(VLContext &context) {
                 _states.insert(state);
             }
             context.states = _states;
-            context.packet_size.push_back(_alloc->size);
+            context.packet_size.push_back(EvaluateExpression(_alloc->expression, context));
         }
         else if (auto _addition = std::dynamic_pointer_cast <AST::Addition> (value)) {
             auto _identifier = std::dynamic_pointer_cast <AST::Identifier> (_addition->left);
@@ -396,22 +469,13 @@ void Assumption::Validate(VLContext &context) {
                     _states.insert(state);
                 }
                 else {
-                    state.heap[index1] = {state.heap[index2].first, state.heap[index2].second + left};
+                    state.heap[index1] = {state.heap[index2].first, state.heap[index2].second + EvaluateExpression(left, context)};
                     _states.insert(state);
-                    state.heap[index1] = {state.heap[index2].first, state.heap[index2].second + right};
+                    state.heap[index1] = {state.heap[index2].first, state.heap[index2].second + EvaluateExpression(right, context)};
                     _states.insert(state);
                 }
             }
             context.states = _states;
-
-            auto _multiplication = std::make_shared <AST::Multiplication> ();
-            _addition->right = _multiplication;
-            auto _identifier = std::make_shared <AST::Identifier> ();
-            _identifier->identifier = identifier3;
-            _multiplication->left = _identifier;
-            auto _integer  = std::make_shared <AST::Integer> ();
-            _integer->value = 4;
-            _multiplication->right = _integer;
         }
         else {
             throw AliasException("Addition expected in right part of assignment", this);
@@ -466,7 +530,23 @@ void Free::Validate(VLContext &context) {
 }
 
 void FunctionCall::Validate(VLContext &context) {
-    std::shared_ptr <FunctionSignature> signature = getFunctionSignature(identifier, this, context);
+    std::shared_ptr <FunctionSignature> _signature = getFunctionSignature(identifier, this, context);
+
+    size_t old_metavariable_stack_size = context.metavariable_stack.size();
+    for (std::pair <std::string, int> p : metavariables) {
+        context.metavariable_stack.push_back(p);
+    }
+
+    std::shared_ptr <FunctionSignatureEvaluated> signature = EvaluateFunctionSignature(_signature, context);
+
+    FunctionDefinition *function_definition = getFunctionPointer(identifier, this, context);
+    if (function_definition) {
+        ValidateFunctionDefinition(*function_definition, context);
+    }
+
+    while(context.metavariable_stack.size() > old_metavariable_stack_size) {
+        context.metavariable_stack.pop_back();
+    }
 
     if (signature->identifiers.size() != arguments.size()) {
         throw AliasException("Incorrect number of arguments in function call", this);

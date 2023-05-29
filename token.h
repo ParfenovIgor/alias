@@ -7,6 +7,8 @@ enum class TokenType {
     BraceClose,
     ParenthesisOpen,
     ParenthesisClose,
+    BracketOpen,
+    BracketClose,
     Asm,
     Include,
     Comma,

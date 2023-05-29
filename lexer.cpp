@@ -192,6 +192,16 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
             i += 1;
             position += 1;
         }
+        else if (i + 1 <= str.size() && str.substr(i, 1) == "[") {
+            token_stream.push_back(Token(TokenType::BracketOpen, line, position, line, position, filename));
+            i += 1;
+            position += 1;
+        }
+        else if (i + 1 <= str.size() && str.substr(i, 1) == "]") {
+            token_stream.push_back(Token(TokenType::BracketClose, line, position, line, position, filename));
+            i += 1;
+            position += 1;
+        }
         else if (i + 1 <= str.size() && str.substr(i, 1) == "$") {
             token_stream.push_back(Token(TokenType::Dereference, line, position, line, position, filename));
             i += 1;

@@ -23,6 +23,21 @@ int findInArguments(std::string &identifier, CPContext &context) {
     return -1;
 }
 
+Type getVariableType(std::string id, Node *node, CPContext &context) {
+    for (int i = (int)context.variable_stack.size() - 1; i >= 0; i--) {
+        if (context.variable_stack[i] == id) {
+            return context.variable_stack_type[i];
+        }
+    }
+    for (int i = 0; i < (int)context.variable_arguments.size(); i++) {
+        if (context.variable_arguments[i] == id) {
+            return context.variable_arguments_type[i];
+        }
+    }
+    std::cout << "Error: identifier not found" << std::endl;
+    exit(1);
+}
+
 int findFunctionIndex(std::string &identifier, CPContext &context) {
     for (int i = (int)context.function_stack.size() - 1; i >= 0; i--) {
         if (context.function_stack[i].first == identifier) {
@@ -40,12 +55,16 @@ int findPhase(std::string &identifier, CPContext &context) {
     }
     else {
         idx = findInArguments(identifier, context);
+        if (idx == -1) {
+            std::cout << "Error: identifier not found" << std::endl;
+            exit(1);
+        }
         return (idx + 2) * 4;
     }
 }
 
 void Compile(std::shared_ptr <Node> node, std::ostream &out) {
-    out << "; program\n";
+    out << "; " << node->filename << " " << node->line_begin + 1 << ":" << node->position_begin + 1 << " -> program\n";
     out << "global main\n";
     out << "extern malloc\n";
     out << "extern free\n";
@@ -62,7 +81,7 @@ void Compile(std::shared_ptr <Node> node, std::ostream &out) {
 }
 
 void Block::Compile(std::ostream &out, CPContext &context) {
-    out << "; block\n";
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> block\n";
     size_t old_variable_stack_size = context.variable_stack.size();
     size_t old_function_stack_size = context.function_stack.size();
     for (auto i = statement_list.begin(); i != statement_list.end(); i++) {
@@ -70,17 +89,19 @@ void Block::Compile(std::ostream &out, CPContext &context) {
     }
     while (context.variable_stack.size() > old_variable_stack_size)
         context.variable_stack.pop_back();
+    while (context.variable_stack_type.size() > old_variable_stack_size)
+        context.variable_stack_type.pop_back();
     while (context.function_stack.size() > old_function_stack_size)
         context.function_stack.pop_back();
 }
 
 void Asm::Compile(std::ostream &out, CPContext &context) {
-    out << "; asm\n";
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> asm\n";
     out << code << "\n";
 }
 
 void If::Compile(std::ostream &out, CPContext &context) {
-    out << "; if\n";
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> if\n";
     branch_list[0].first->Compile(out, context);
     int idx = context.branch_index;
     context.branch_index++;
@@ -96,7 +117,7 @@ void If::Compile(std::ostream &out, CPContext &context) {
 }
 
 void While::Compile(std::ostream &out, CPContext &context) {
-    out << "; while\n";
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> while\n";
     int idx = context.branch_index;
     context.branch_index++;
     out << "_while" << idx << ":\n";
@@ -123,7 +144,7 @@ void FunctionDefinition::Compile(std::ostream &out, CPContext &context) {
         context.function_index++;
     }
 
-    out << "; function definition\n";
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> function definition\n";
     if (external) {
         out << "global " << identifier << "\n";
     }
@@ -137,9 +158,15 @@ void FunctionDefinition::Compile(std::ostream &out, CPContext &context) {
     std::vector <std::string> variable_arguments = context.variable_arguments;
     context.variable_stack.clear();
     context.variable_arguments.clear();
+    context.variable_arguments_type.clear();
     context.function_stack.push_back({name, index});
+    for (int i = 0; i < (int)metavariables.size(); i++) {
+        context.variable_arguments.push_back(metavariables[i]);
+        context.variable_arguments_type.push_back(Type::Int);
+    }
     for (int i = 0; i < (int)signature->identifiers.size(); i++) {
         context.variable_arguments.push_back(signature->identifiers[i]);
+        context.variable_arguments_type.push_back(signature->types[i]);
     }
     body->Compile(out, context);
     context.variable_stack = variable_stack;
@@ -151,18 +178,30 @@ void FunctionDefinition::Compile(std::ostream &out, CPContext &context) {
 }
 
 void Prototype::Compile(std::ostream &out, CPContext &context) {
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> prototype\n";
     out << "extern " << name << "\n";
     context.function_stack.push_back({name, -1});
 }
 
 void Definition::Compile(std::ostream &out, CPContext &context) {
-    out << "; definition\n";
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> definition\n";
     context.variable_stack.push_back(identifier);
+    context.variable_stack_type.push_back(type);
     out << "sub esp, 4\n";
 }
 
 void Assignment::Compile(std::ostream &out, CPContext &context) {
-    out << "; assignment\n";
+    if (getVariableType(identifier, this, context) == Type::Ptr) {
+        if (auto _addition = std::dynamic_pointer_cast <AST::Addition> (value)) {
+            auto _identifier = std::dynamic_pointer_cast <AST::Identifier> (_addition->left);
+            auto _integer = std::dynamic_pointer_cast <AST::Integer> (_addition->right);
+            if (_identifier && _integer && getVariableType(_identifier->identifier, this, context) == Type::Ptr) {
+                _integer->value *= 4;
+            }
+        }
+    }
+
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> assignment\n";
     value->Compile(out, context);
     int phase = findPhase(identifier, context);
     out << "mov eax, [esp - 4]\n";
@@ -170,7 +209,7 @@ void Assignment::Compile(std::ostream &out, CPContext &context) {
 }
 
 void Movement::Compile(std::ostream &out, CPContext &context) {
-    out << "; movement\n";
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> movement\n";
     value->Compile(out, context);
     int phase = findPhase(identifier, context);
     out << "mov eax, [esp - 4]\n";
@@ -179,7 +218,7 @@ void Movement::Compile(std::ostream &out, CPContext &context) {
 }
 
 void MovementString::Compile(std::ostream &out, CPContext &context) {
-    out << "; movement string\n";
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> movement string\n";
     int idx = context.branch_index;
     context.branch_index++;
     out << "jmp _strbufend" << idx << "\n";
@@ -202,7 +241,24 @@ void MovementString::Compile(std::ostream &out, CPContext &context) {
 }
 
 void Assumption::Compile(std::ostream &out, CPContext &context) {
-    out << "; assumption\n";
+    if (auto _assignment = std::dynamic_pointer_cast <AST::Assignment> (statement)) {
+        if (auto _addition = std::dynamic_pointer_cast <AST::Addition> (_assignment->value)) {
+            auto _identifier2 = std::dynamic_pointer_cast <AST::Identifier> (_addition->left);
+            auto _identifier3 = std::dynamic_pointer_cast <AST::Identifier> (_addition->right);
+            std::string identifier2 = _identifier2->identifier;
+            std::string identifier3 = _identifier3->identifier;
+            auto _multiplication = std::make_shared <AST::Multiplication> ();
+            _addition->right = _multiplication;
+            auto _identifier = std::make_shared <AST::Identifier> ();
+            _identifier->identifier = identifier3;
+            _multiplication->left = _identifier;
+            auto _integer  = std::make_shared <AST::Integer> ();
+            _integer->value = 4;
+            _multiplication->right = _integer;
+        }
+    }
+
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> assumption\n";
 
     int ind_error = context.branch_index++;
     out << "jmp aftererror" << ind_error << "\n";
@@ -212,8 +268,9 @@ void Assumption::Compile(std::ostream &out, CPContext &context) {
 
     int phase = findPhase(identifier, context);
     int idx = context.branch_index++;
+    left->Compile(out, context);
     out << "mov eax, [ebp + " << phase << "]\n";
-    out << "sub eax, " << left << "\n";
+    out << "sub eax, [esp - 4]\n";
     out << "jl " << "_set1_" << idx << "\n";
     out << "jmp _setend" << idx << "\n";
     out << "_set1_" << idx << ":\n";
@@ -228,7 +285,8 @@ void Assumption::Compile(std::ostream &out, CPContext &context) {
     out << "_setend" << idx << ":\n";
 
     idx = context.branch_index++;
-    out << "mov eax, " << right << "\n";
+    right->Compile(out, context);
+    out << "mov eax, [esp - 4]\n";
     out << "sub eax, [ebp + " << phase << "]\n";
     out << "jl " << "_set1_" << idx << "\n";
     out << "jmp _setend" << idx << "\n";
@@ -247,27 +305,35 @@ void Assumption::Compile(std::ostream &out, CPContext &context) {
 }
 
 void Identifier::Compile(std::ostream &out, CPContext &context) {
-    out << "; identifier\n";
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> identifier\n";
     int phase = findPhase(identifier, context);
     out << "mov eax, [ebp + " << phase << "]\n";
     out << "mov [esp - 4], eax\n";
 }
 
 void Integer::Compile(std::ostream &out, CPContext &context) {
-    out << "; integer\n";
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> integer\n";
     out << "mov [esp - 4], dword " << value << "\n";
 }
 
 void Alloc::Compile(std::ostream &out, CPContext &context) {
-    out << "; alloc\n";
-    out << "push dword " << 4 * size << "\n";
+    auto _multiplication = std::make_shared <AST::Multiplication> ();
+    _multiplication->left = expression;
+    auto _integer  = std::make_shared <AST::Integer> ();
+    _integer->value = 4;
+    _multiplication->right = _integer;
+    expression = _multiplication;
+
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> alloc\n";
+    expression->Compile(out, context);
+    out << "push dword [esp - 4]\n";
     out << "call malloc\n";
     out << "add esp, 4\n";
     out << "mov [esp - 4], eax\n";
 }
 
 void Free::Compile(std::ostream &out, CPContext &context) {
-    out << "; free\n";
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> free\n";
     arg->Compile(out, context);
     out << "push dword [esp - 4]\n";
     out << "call free\n";
@@ -275,10 +341,13 @@ void Free::Compile(std::ostream &out, CPContext &context) {
 }
 
 void FunctionCall::Compile(std::ostream &out, CPContext &context) {
-    out << "; function call\n";
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> function call\n";
     for (int i = (int)arguments.size() - 1; i >= 0; i--) {
         int phase = findPhase(arguments[i], context);
         out << "push dword [ebp + " << phase << "]\n";
+    }
+    for (int i = (int)metavariables.size() - 1; i >= 0; i--) {
+        out << "push dword " << metavariables[i].second << "\n";
     }
     int idx = findFunctionIndex(identifier, context);
     if (idx == -1) {
@@ -287,7 +356,7 @@ void FunctionCall::Compile(std::ostream &out, CPContext &context) {
     else {
         out << "call _fun" << idx << "\n";
     }
-    out << "add esp, " << (int)arguments.size() * 4 << "\n";
+    out << "add esp, " << (int)(arguments.size() + metavariables.size()) * 4 << "\n";
     for (int i = (int)arguments.size() - 1; i >= 0; i--) {
         int phase = findPhase(arguments[i], context);
         out << "mov eax, [esp - " << (((int)arguments.size() - i) * 4) << "]\n";
@@ -296,7 +365,7 @@ void FunctionCall::Compile(std::ostream &out, CPContext &context) {
 }
 
 void Dereference::Compile(std::ostream &out, CPContext &context) {
-    out << "; dereference\n";
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> dereference\n";
     arg->Compile(out, context);
     out << "mov eax, [esp - 4]\n";
     out << "mov ebx, [eax]\n";
@@ -304,7 +373,7 @@ void Dereference::Compile(std::ostream &out, CPContext &context) {
 }
 
 void Addition::Compile(std::ostream &out, CPContext &context) {
-    out << "; addition\n";
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> addition\n";
     left->Compile(out, context);
     out << "sub esp, 4\n";
     context.variable_stack.push_back("__junk");
@@ -317,7 +386,7 @@ void Addition::Compile(std::ostream &out, CPContext &context) {
 }
 
 void Subtraction::Compile(std::ostream &out, CPContext &context) {
-    out << "; subtraction\n";
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> subtraction\n";
     left->Compile(out, context);
     out << "sub esp, 4\n";
     context.variable_stack.push_back("__junk");
@@ -330,7 +399,7 @@ void Subtraction::Compile(std::ostream &out, CPContext &context) {
 }
 
 void Multiplication::Compile(std::ostream &out, CPContext &context) {
-    out << "; multiplication\n";
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> multiplication\n";
     left->Compile(out, context);
     out << "sub esp, 4\n";
     context.variable_stack.push_back("__junk");
@@ -344,7 +413,7 @@ void Multiplication::Compile(std::ostream &out, CPContext &context) {
 }
 
 void Less::Compile(std::ostream &out, CPContext &context) {
-    out << "; less\n";
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> less\n";
     left->Compile(out, context);
     out << "sub esp, 4\n";
     context.variable_stack.push_back("__junk");
@@ -363,7 +432,7 @@ void Less::Compile(std::ostream &out, CPContext &context) {
 }
 
 void Equal::Compile(std::ostream &out, CPContext &context) {
-    out << "; less\n";
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> equal\n";
     left->Compile(out, context);
     out << "sub esp, 4\n";
     context.variable_stack.push_back("__junk");

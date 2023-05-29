@@ -183,11 +183,7 @@ namespace Syntax {
                 throw AliasException("( expected in alloc expression", ts.GetToken());
             }
             ts.NextToken();
-            if (ts.GetToken().type != TokenType::Integer) {
-                throw AliasException("Integer expected in alloc expression", ts.GetToken());
-            }
-            _alloc->size = ts.GetToken().value_int;
-            ts.NextToken();
+            _alloc->expression = ProcessExpression(ts);
             if (ts.GetToken().type != TokenType::ParenthesisClose) {
                 throw AliasException(") expected in alloc expression", ts.GetToken());
             }
@@ -300,6 +296,28 @@ namespace Syntax {
             }
             function_definition->name = ts.GetToken().value_string;
             ts.NextToken();
+            if (ts.GetToken().type == TokenType::BracketOpen) {
+                ts.NextToken();
+                while (true) {
+                    if (ts.GetToken().type == TokenType::BracketClose) {
+                        ts.NextToken();
+                        break;
+                    }
+                    if (ts.GetToken().type != TokenType::Identifier) {
+                        throw AliasException("Idenfier expected in metavariable list", ts.GetToken());
+                    }
+                    function_definition->metavariables.push_back(ts.GetToken().value_string);
+                    ts.NextToken();
+                    if (ts.GetToken().type == TokenType::BracketClose) {
+                        ts.NextToken();
+                        break;
+                    }
+                    if (ts.GetToken().type != TokenType::Comma) {
+                        throw AliasException(", expected in metavariables list", ts.GetToken());
+                    }
+                    ts.NextToken();
+                }
+            }
             if (ts.GetToken().type != TokenType::ParenthesisOpen) {
                 throw AliasException("( expected in function definition", ts.GetToken());
             }
@@ -327,16 +345,10 @@ namespace Syntax {
                 else {
                     function_signature->types.push_back(AST::Type::Ptr);
                     ts.NextToken();
-                    if (ts.GetToken().type != TokenType::Integer) {
-                        throw AliasException("Integer expected in pointer argument", ts.GetToken());
-                    }
-                    function_signature->size_in.push_back(ts.GetToken().value_int);
-                    ts.NextToken();
-                    if (ts.GetToken().type != TokenType::Integer) {
-                        throw AliasException("Integer expected in pointer argument", ts.GetToken());
-                    }
-                    function_signature->size_out.push_back(ts.GetToken().value_int);
-                    ts.NextToken();
+                    auto _expression1 = ProcessExpression(ts);
+                    auto _expression2 = ProcessExpression(ts);
+                    function_signature->size_in.push_back(_expression1);
+                    function_signature->size_out.push_back(_expression2);
                 }
                 if (ts.GetToken().type == TokenType::ParenthesisClose) {
                     ts.NextToken();
@@ -370,6 +382,28 @@ namespace Syntax {
             }
             prototype->name = ts.GetToken().value_string;
             ts.NextToken();
+            if (ts.GetToken().type == TokenType::BracketOpen) {
+                ts.NextToken();
+                while (true) {
+                    if (ts.GetToken().type == TokenType::BracketClose) {
+                        ts.NextToken();
+                        break;
+                    }
+                    if (ts.GetToken().type != TokenType::Identifier) {
+                        throw AliasException("Idenfier expected in metavariable list", ts.GetToken());
+                    }
+                    prototype->metavariables.push_back(ts.GetToken().value_string);
+                    ts.NextToken();
+                    if (ts.GetToken().type == TokenType::BracketClose) {
+                        ts.NextToken();
+                        break;
+                    }
+                    if (ts.GetToken().type != TokenType::Comma) {
+                        throw AliasException(", expected in metavariables list", ts.GetToken());
+                    }
+                    ts.NextToken();
+                }
+            }
             if (ts.GetToken().type != TokenType::ParenthesisOpen) {
                 throw AliasException("( expected in function prototype", ts.GetToken());
             }
@@ -396,16 +430,10 @@ namespace Syntax {
                 else {
                     function_signature->types.push_back(AST::Type::Ptr);
                     ts.NextToken();
-                    if (ts.GetToken().type != TokenType::Integer) {
-                        throw AliasException("Integer expected in pointer argument", ts.GetToken());
-                    }
-                    function_signature->size_in.push_back(ts.GetToken().value_int);
-                    ts.NextToken();
-                    if (ts.GetToken().type != TokenType::Integer) {
-                        throw AliasException("Integer expected in pointer argument", ts.GetToken());
-                    }
-                    function_signature->size_out.push_back(ts.GetToken().value_int);
-                    ts.NextToken();
+                    auto _expression1 = ProcessExpression(ts);
+                    auto _expression2 = ProcessExpression(ts);
+                    function_signature->size_in.push_back(_expression1);
+                    function_signature->size_out.push_back(_expression2);
                 }
                 if (ts.GetToken().type == TokenType::ParenthesisClose) {
                     break;
@@ -462,16 +490,8 @@ namespace Syntax {
             }
             _assumption->identifier = ts.GetToken().value_string;
             ts.NextToken();
-            if (ts.GetToken().type != TokenType::Integer) {
-                throw AliasException("Integer expected in assume condition", ts.GetToken());
-            }
-            _assumption->left = ts.GetToken().value_int;
-            ts.NextToken();
-            if (ts.GetToken().type != TokenType::Integer) {
-                throw AliasException("Integer expected in assume condition", ts.GetToken());
-            }
-            _assumption->right = ts.GetToken().value_int;
-            ts.NextToken();
+            _assumption->left = ProcessExpression(ts);
+            _assumption->right = ProcessExpression(ts);
             if (ts.GetToken().type != TokenType::ParenthesisClose) {
                 throw AliasException(") expected in assume condition", ts.GetToken());
             }
@@ -513,6 +533,38 @@ namespace Syntax {
             }
             function_call->identifier = ts.GetToken().value_string;
             ts.NextToken();
+            if (ts.GetToken().type == TokenType::BracketOpen) {
+                ts.NextToken();
+                while (true) {
+                    if (ts.GetToken().type == TokenType::BracketClose) {
+                        ts.NextToken();
+                        break;
+                    }
+                    if (ts.GetToken().type != TokenType::Identifier) {
+                        throw AliasException("Idenfier expected in metavariable list", ts.GetToken());
+                    }
+                    std::string _identifier = ts.GetToken().value_string;
+                    ts.NextToken();
+                    if (ts.GetToken().type != TokenType::Equal) {
+                        throw AliasException("= expected in metavariable list", ts.GetToken());
+                    }
+                    ts.NextToken();
+                    if (ts.GetToken().type != TokenType::Integer) {
+                        throw AliasException("Integer expected in metavariable list", ts.GetToken());
+                    }
+                    int _integer = ts.GetToken().value_int;
+                    ts.NextToken();
+                    function_call->metavariables.push_back({_identifier, _integer});
+                    if (ts.GetToken().type == TokenType::BracketClose) {
+                        ts.NextToken();
+                        break;
+                    }
+                    if (ts.GetToken().type != TokenType::Comma) {
+                        throw AliasException(", expected in metavariables list", ts.GetToken());
+                    }
+                    ts.NextToken();
+                }
+            }
             if (ts.GetToken().type != TokenType::ParenthesisOpen) {
                 throw AliasException("( expected in function call", ts.GetToken());
             }

@@ -14,16 +14,22 @@ class Asm;
 class If;
 class While;
 class FunctionDefinition;
+class Prototype;
 class Definition;
 class Assignment;
+class Movement;
+class MovementString;
 class Assumption;
 class Expression;
 class Identifier;
 class Integer;
 class Alloc;
 class Free;
+class FunctionCall;
 class Dereference;
 class Addition;
+class Subtraction;
+class Multiplication;
 class Less;
 class Equal;
 
@@ -33,6 +39,13 @@ enum class Type {
 };
 
 class FunctionSignature {
+public:
+    std::vector < std::string > identifiers;
+    std::vector <Type> types;
+    std::vector < std::shared_ptr <Expression> > size_in, size_out;
+};
+
+class FunctionSignatureEvaluated {
 public:
     std::vector < std::string > identifiers;
     std::vector <Type> types;
@@ -48,13 +61,17 @@ struct VLContext {
     std::vector <Type> variable_type_stack;
     std::vector < std::string > function_stack;
     std::vector < std::shared_ptr <FunctionSignature> > function_signature_stack;
+    std::vector <FunctionDefinition*> function_pointer_stack;
     std::vector <int> packet_size;
     std::set <State> states;
+    std::vector < std::pair <std::string, int> > metavariable_stack;
 };
 
 struct CPContext {
     std::vector <std::string> variable_stack;
+    std::vector <Type> variable_stack_type;
     std::vector <std::string> variable_arguments;
+    std::vector <Type> variable_arguments_type;
     std::vector < std::pair < std::string, int> > function_stack;
     int function_index = 0;
     int branch_index = 0;
@@ -105,6 +122,7 @@ public:
 class FunctionDefinition : public Statement {
 public:
     std::string name;
+    std::vector <std::string> metavariables;
     std::shared_ptr <FunctionSignature> signature;
     std::shared_ptr <Block> body;
     bool external;
@@ -115,6 +133,7 @@ public:
 class Prototype : public Statement {
 public:
     std::string name;
+    std::vector <std::string> metavariables;
     std::shared_ptr <FunctionSignature> signature;
     void Validate(VLContext &context);
     void Compile(std::ostream &out, CPContext &context);
@@ -155,7 +174,7 @@ public:
 class Assumption : public Statement {
 public:
     std::string identifier;
-    int left, right;
+    std::shared_ptr <Expression> left, right;
     std::shared_ptr <Statement> statement;
     void Validate(VLContext &context);
     void Compile(std::ostream &out, CPContext &context);
@@ -180,7 +199,7 @@ public:
 
 class Alloc : public Expression {
 public:
-    int size;
+    std::shared_ptr <Expression> expression;
     void Validate(VLContext &context);
     void Compile(std::ostream &out, CPContext &context);
 };
@@ -195,7 +214,8 @@ public:
 class FunctionCall : public Statement {
 public:
     std::string identifier;
-    std::vector < std::string > arguments;
+    std::vector <std::pair <std::string, int>> metavariables;
+    std::vector <std::string> arguments;
     void Validate(VLContext &context);
     void Compile(std::ostream &out, CPContext &context);
 };
