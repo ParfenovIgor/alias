@@ -43,6 +43,7 @@ public:
     std::vector < std::string > identifiers;
     std::vector <Type> types;
     std::vector < std::shared_ptr <Expression> > size_in, size_out;
+    std::vector <bool> is_const;
 };
 
 class FunctionSignatureEvaluated {
@@ -50,6 +51,7 @@ public:
     std::vector < std::string > identifiers;
     std::vector <Type> types;
     std::vector <int> size_in, size_out;
+    std::vector <bool> is_const;
 };
 
 struct State {
@@ -59,6 +61,7 @@ struct State {
 struct VLContext {
     std::vector < std::string > variable_stack;
     std::vector <Type> variable_type_stack;
+    std::vector <bool> variable_is_const_stack;
     std::vector < std::string > function_stack;
     std::vector < std::shared_ptr <FunctionSignature> > function_signature_stack;
     std::vector <FunctionDefinition*> function_pointer_stack;
@@ -214,7 +217,7 @@ public:
 class FunctionCall : public Statement {
 public:
     std::string identifier;
-    std::vector <std::pair <std::string, int>> metavariables;
+    std::vector <std::pair <std::string, std::shared_ptr <Expression>>> metavariables;
     std::vector <std::string> arguments;
     void Validate(VLContext &context);
     void Compile(std::ostream &out, CPContext &context);
@@ -242,6 +245,13 @@ public:
 };
 
 class Multiplication : public Expression {
+public:
+    std::shared_ptr <Expression> left, right;
+    void Validate(VLContext &context);
+    void Compile(std::ostream &out, CPContext &context);
+};
+
+class Division : public Expression {
 public:
     std::shared_ptr <Expression> left, right;
     void Validate(VLContext &context);

@@ -110,6 +110,19 @@ namespace Syntax {
             _multiplication->filename = _expression1->filename;
             return _multiplication;
         }
+        if (ts.GetToken().type == TokenType::Div) {
+            ts.NextToken();
+            std::shared_ptr <AST::Expression> _expression2 = ProcessExpression(ts);
+            std::shared_ptr <AST::Division> _division = std::make_shared <AST::Division> ();
+            _division->left = _expression1;
+            _division->right = _expression2;
+            _division->line_begin = _expression1->line_begin;
+            _division->position_begin = _expression1->position_begin;
+            _division->line_end= _expression2->line_end;
+            _division->position_end= _expression2->position_end;
+            _division->filename = _expression1->filename;
+            return _division;
+        }
         if (ts.GetToken().type == TokenType::Less) {
             ts.NextToken();
             std::shared_ptr <AST::Expression> _expression2 = ProcessExpression(ts);
@@ -339,12 +352,26 @@ namespace Syntax {
                 if (ts.GetToken().type == TokenType::Int) {
                     function_signature->types.push_back(AST::Type::Int);
                     ts.NextToken();
+                    if (ts.GetToken().type == TokenType::Const) {
+                        function_signature->is_const.push_back(true);
+                        ts.NextToken();
+                    }
+                    else {
+                        function_signature->is_const.push_back(false);
+                    }
                     function_signature->size_in.push_back(0);
                     function_signature->size_out.push_back(0);
                 }
                 else {
                     function_signature->types.push_back(AST::Type::Ptr);
                     ts.NextToken();
+                    if (ts.GetToken().type == TokenType::Const) {
+                        function_signature->is_const.push_back(true);
+                        ts.NextToken();
+                    }
+                    else {
+                        function_signature->is_const.push_back(false);
+                    }
                     auto _expression1 = ProcessExpression(ts);
                     auto _expression2 = ProcessExpression(ts);
                     function_signature->size_in.push_back(_expression1);
@@ -549,12 +576,7 @@ namespace Syntax {
                         throw AliasException("= expected in metavariable list", ts.GetToken());
                     }
                     ts.NextToken();
-                    if (ts.GetToken().type != TokenType::Integer) {
-                        throw AliasException("Integer expected in metavariable list", ts.GetToken());
-                    }
-                    int _integer = ts.GetToken().value_int;
-                    ts.NextToken();
-                    function_call->metavariables.push_back({_identifier, _integer});
+                    function_call->metavariables.push_back({_identifier, ProcessExpression(ts)});
                     if (ts.GetToken().type == TokenType::BracketClose) {
                         ts.NextToken();
                         break;

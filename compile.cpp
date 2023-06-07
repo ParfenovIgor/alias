@@ -194,9 +194,13 @@ void Assignment::Compile(std::ostream &out, CPContext &context) {
     if (getVariableType(identifier, this, context) == Type::Ptr) {
         if (auto _addition = std::dynamic_pointer_cast <AST::Addition> (value)) {
             auto _identifier = std::dynamic_pointer_cast <AST::Identifier> (_addition->left);
-            auto _integer = std::dynamic_pointer_cast <AST::Integer> (_addition->right);
-            if (_identifier && _integer && getVariableType(_identifier->identifier, this, context) == Type::Ptr) {
-                _integer->value *= 4;
+            if (_identifier && getVariableType(_identifier->identifier, this, context) == Type::Ptr) {
+                auto _multiplication = std::make_shared <AST::Multiplication> ();
+                _multiplication->left = _addition->right;
+                _addition->right = _multiplication;
+                auto _integer  = std::make_shared <AST::Integer> ();
+                _integer->value = 4;
+                _multiplication->right = _integer;
             }
         }
     }
@@ -241,23 +245,6 @@ void MovementString::Compile(std::ostream &out, CPContext &context) {
 }
 
 void Assumption::Compile(std::ostream &out, CPContext &context) {
-    if (auto _assignment = std::dynamic_pointer_cast <AST::Assignment> (statement)) {
-        if (auto _addition = std::dynamic_pointer_cast <AST::Addition> (_assignment->value)) {
-            auto _identifier2 = std::dynamic_pointer_cast <AST::Identifier> (_addition->left);
-            auto _identifier3 = std::dynamic_pointer_cast <AST::Identifier> (_addition->right);
-            std::string identifier2 = _identifier2->identifier;
-            std::string identifier3 = _identifier3->identifier;
-            auto _multiplication = std::make_shared <AST::Multiplication> ();
-            _addition->right = _multiplication;
-            auto _identifier = std::make_shared <AST::Identifier> ();
-            _identifier->identifier = identifier3;
-            _multiplication->left = _identifier;
-            auto _integer  = std::make_shared <AST::Integer> ();
-            _integer->value = 4;
-            _multiplication->right = _integer;
-        }
-    }
-
     out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> assumption\n";
 
     int ind_error = context.branch_index++;
@@ -347,7 +334,8 @@ void FunctionCall::Compile(std::ostream &out, CPContext &context) {
         out << "push dword [ebp + " << phase << "]\n";
     }
     for (int i = (int)metavariables.size() - 1; i >= 0; i--) {
-        out << "push dword " << metavariables[i].second << "\n";
+        metavariables[i].second->Compile(out, context);
+        out << "push dword [esp - 4]\n";
     }
     int idx = findFunctionIndex(identifier, context);
     if (idx == -1) {
@@ -409,6 +397,20 @@ void Multiplication::Compile(std::ostream &out, CPContext &context) {
     out << "mov eax, [esp - 4]\n";
     out << "mov edx, [esp - 8]\n";
     out << "mul edx\n";
+    out << "mov [esp - 4], eax\n";
+}
+
+void Division::Compile(std::ostream &out, CPContext &context) {
+    out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> division\n";
+    left->Compile(out, context);
+    out << "sub esp, 4\n";
+    context.variable_stack.push_back("__junk");
+    right->Compile(out, context);
+    out << "add esp, 4\n";
+    context.variable_stack.pop_back();
+    out << "mov eax, [esp - 4]\n";
+    out << "mov edx, 0\n";
+    out << "div dword [esp - 8]\n";
     out << "mov [esp - 4], eax\n";
 }
 

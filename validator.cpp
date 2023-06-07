@@ -25,6 +25,20 @@ int getVariableIndex(std::string id, Node *node, VLContext &context) {
     throw AliasException("Identifier was not declared in this scope", node);
 }
 
+void checkIdentifier(std::string id, Node *node, VLContext &context) {
+    for (int i = (int)context.variable_stack.size() - 1; i >= 0; i--) {
+        if (context.variable_stack[i] == id) {
+            return;
+        }
+    }
+    for (std::pair <std::string,int> p : context.metavariable_stack) {
+        if (p.first == id) {
+            return;
+        }
+    }
+    throw AliasException("Identifier was not declared in this scope", node);
+}
+
 Type getVariableType(std::string id, Node *node, VLContext &context) {
     for (int i = (int)context.variable_stack.size() - 1; i >= 0; i--) {
         if (context.variable_stack[i] == id) {
@@ -52,43 +66,111 @@ FunctionDefinition* getFunctionPointer(std::string id, Node *node, VLContext &co
     throw AliasException("Identifier was not declared in this scope", node);
 }
 
-int EvaluateExpression(std::shared_ptr <Expression> expression, VLContext context) {
+bool EvaluateExpression(std::shared_ptr <Expression> expression, VLContext context, int &result) {
     if (auto _identifier = std::dynamic_pointer_cast <AST::Identifier> (expression)) {
         for (std::pair <std::string,int> p : context.metavariable_stack) {
             if (p.first == _identifier->identifier) {
-                return p.second;
+                result = p.second;
+                return true;
             }
         }
-        throw AliasException("Metavariable was not defined", expression.get());
+        return false;
     }
     if (auto _integer = std::dynamic_pointer_cast <AST::Integer> (expression)) {
-        return _integer->value;
+        result = _integer->value;
+        return true;
     }
     if (auto _addition = std::dynamic_pointer_cast <AST::Addition> (expression)) {
-        int left = EvaluateExpression(_addition->left, context);
-        int right = EvaluateExpression(_addition->right, context);
-        return left + right;
+        int left, right;
+        bool l = EvaluateExpression(_addition->left, context, left);
+        bool r = EvaluateExpression(_addition->right, context, right);
+        if (l && r) {
+            result = left + right;
+            return true;
+        }
+        else {
+            return false;
+        }
     }
     if (auto _subtraction = std::dynamic_pointer_cast <AST::Subtraction> (expression)) {
-        int left = EvaluateExpression(_subtraction->left, context);
-        int right = EvaluateExpression(_subtraction->right, context);
-        return left - right;
+        int left, right;
+        bool l = EvaluateExpression(_subtraction->left, context, left);
+        bool r = EvaluateExpression(_subtraction->right, context, right);
+        if (l && r) {
+            result = left - right;
+            return true;
+        }
+        else {
+            return false;
+        }
     }
     if (auto _multiplication = std::dynamic_pointer_cast <AST::Multiplication> (expression)) {
-        int left = EvaluateExpression(_multiplication->left, context);
-        int right = EvaluateExpression(_multiplication->right, context);
-        return left * right;
+        int left, right;
+        bool l = EvaluateExpression(_multiplication->left, context, left);
+        bool r = EvaluateExpression(_multiplication->right, context, right);
+        if (l && r) {
+            result = left * right;
+            return true;
+        }
+        else {
+            return false;
+        }
     }
-    throw AliasException("Expression can not be evaluated", expression.get());
+    if (auto _division = std::dynamic_pointer_cast <AST::Division> (expression)) {
+        int left, right;
+        bool l = EvaluateExpression(_division->left, context, left);
+        bool r = EvaluateExpression(_division->right, context, right);
+        if (l && r) {
+            result = left / right;
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+    if (auto _less = std::dynamic_pointer_cast <AST::Less> (expression)) {
+        int left, right;
+        bool l = EvaluateExpression(_less->left, context, left);
+        bool r = EvaluateExpression(_less->right, context, right);
+        if (l && r) {
+            result = left < right;
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+    if (auto _equal = std::dynamic_pointer_cast <AST::Equal> (expression)) {
+        int left, right;
+        bool l = EvaluateExpression(_equal->left, context, left);
+        bool r = EvaluateExpression(_equal->right, context, right);
+        if (l && r) {
+            result = left == right;
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+    return false;
 }
 
 std::shared_ptr <FunctionSignatureEvaluated> EvaluateFunctionSignature(std::shared_ptr <FunctionSignature> signature, VLContext context) {
     std::shared_ptr <FunctionSignatureEvaluated> _signature = std::make_shared <FunctionSignatureEvaluated> ();
     _signature->identifiers = signature->identifiers;
     _signature->types = signature->types;
+    _signature->is_const = signature->is_const;
     for (auto expr : signature->size_in) {
         if (expr) {
-            _signature->size_in.push_back(EvaluateExpression(expr, context));
+            int value;
+            bool good = EvaluateExpression(expr, context, value);
+            if (!good) {
+                throw AliasException("Could not evaluate compile time constant", expr.get());
+            }
+            if (value < 0) {
+                throw AliasException("Pre condition size has to be non-negative", expr.get());
+            }
+            _signature->size_in.push_back(value);
         }
         else {
             _signature->size_in.push_back(0);
@@ -96,7 +178,15 @@ std::shared_ptr <FunctionSignatureEvaluated> EvaluateFunctionSignature(std::shar
     }
     for (auto expr : signature->size_out) {
         if (expr) {
-            _signature->size_out.push_back(EvaluateExpression(expr, context));
+            int value;
+            bool good = EvaluateExpression(expr, context, value);
+            if (!good) {
+                throw AliasException("Could not evaluate compile time constant", expr.get());
+            }
+            if (value < 0) {
+                throw AliasException("Post condition size has to be non-negative", expr.get());
+            }
+            _signature->size_out.push_back(value);
         }
         else {
             _signature->size_out.push_back(0);
@@ -134,6 +224,7 @@ void ValidateFunctionDefinition(FunctionDefinition &function, VLContext &context
     for (int i = 0; i < n; i++) {
         context.variable_stack.push_back(signature->identifiers[i]);
         context.variable_type_stack.push_back(signature->types[i]);
+        context.variable_is_const_stack.push_back(signature->is_const[i]);
     }
 
     function.body->Validate(context);
@@ -149,7 +240,9 @@ void ValidateFunctionDefinition(FunctionDefinition &function, VLContext &context
                 }
             }
             else {
-                if (state.heap[i].first == -1 || state.heap[i].second != 0 || context.packet_size[state.heap[i].second] < signature->size_out[i]) {
+                if (state.heap[i].first == -1 || 
+                    signature->is_const[i] && (context.packet_size[state.heap[i].first] - state.heap[i].second < signature->size_out[i]) ||
+                    !signature->is_const[i] && (state.heap[i].second != 0 || context.packet_size[state.heap[i].first] < signature->size_out[i])) {
                     throw AliasException("Function post condition failed", &function);
                 }
                 if (packet_num[i] == -2) {
@@ -242,6 +335,7 @@ void Block::Validate(VLContext &context) {
     while (context.variable_stack.size() > old_variable_stack_size) {
         context.variable_stack.pop_back();
         context.variable_type_stack.pop_back();
+        context.variable_is_const_stack.pop_back();
     }
     while (context.function_stack.size() > old_function_stack_size) {
         context.function_stack.pop_back();
@@ -254,6 +348,18 @@ void Asm::Validate(VLContext &context) {
 }
 
 void If::Validate(VLContext &context) {
+    int value;
+    bool good = EvaluateExpression(branch_list[0].first, context, value);
+    if (good) {
+        if (value != 0) {
+            branch_list[0].second->Validate(context);
+        }
+        else if (else_body) {
+            else_body->Validate(context);
+        }
+        return;
+    }
+
     branch_list[0].first->Validate(context);
     std::set <State> _states = context.states;
     int old_cnt_packets1 = (int)context.packet_size.size();
@@ -330,6 +436,7 @@ void Prototype::Validate(VLContext &context) {
 void Definition::Validate(VLContext &context) {
     context.variable_stack.push_back(identifier);
     context.variable_type_stack.push_back(type);
+    context.variable_is_const_stack.push_back(false);
 
     std::set <State> _states;
     for (State state : context.states) {
@@ -340,44 +447,53 @@ void Definition::Validate(VLContext &context) {
 }
 
 void Assignment::Validate(VLContext &context) {
+    int index = getVariableIndex(identifier, this, context);
+    if (context.variable_is_const_stack[index]) {
+        throw AliasException("Const values can not be changed", this);
+    }
     if (getVariableType(identifier, this, context) == Type::Ptr) {
         if (auto _alloc = std::dynamic_pointer_cast <AST::Alloc> (value)) {
-            int index = getVariableIndex(identifier, this, context);
             std::set <State> _states;
             for (State state : context.states) {
                 state.heap[index] = {(int)context.packet_size.size(), 0};
                 _states.insert(state);
             }
             context.states = _states;
-            context.packet_size.push_back(EvaluateExpression(_alloc->expression, context));
+            int value;
+            bool good = EvaluateExpression(_alloc->expression, context, value);
+            if (!good) {
+                throw AliasException("Could not evaluate compile time constant", _alloc->expression.get());
+            }
+            if (value < 0) {
+                throw AliasException("Alloc size has to be non negative", _alloc->expression.get());
+            }
+            context.packet_size.push_back(value);
         }
         else if (auto _addition = std::dynamic_pointer_cast <AST::Addition> (value)) {
             auto _identifier = std::dynamic_pointer_cast <AST::Identifier> (_addition->left);
-            auto _integer = std::dynamic_pointer_cast <AST::Integer> (_addition->right);
             if (!_identifier) {
                 throw AliasException("Identifier expected in left part of addition in right part of assignment", this);
             }
-            if (!_integer) {
-                throw AliasException("Integer variable expected in right part of addition in right part of assignment", this);
+            int value;
+            bool good = EvaluateExpression(_addition->right, context, value);
+            if (!good) {
+                throw AliasException("Could not evaluate compile time constant", _addition->right.get());
             }
             if (getVariableType(_identifier->identifier, this, context) == Type::Ptr) {
-                int index1 = getVariableIndex(identifier, this, context);
                 int index2 = getVariableIndex(_identifier->identifier, this, context);
                 std::set <State> _states;
                 for (State state : context.states) {
                     if (state.heap[index2].first == -1) {
-                        state.heap[index1] = {-1, 0};
+                        state.heap[index] = {-1, 0};
                     }
                     else {
-                        state.heap[index1] = {state.heap[index2].first, state.heap[index2].second + _integer->value};
+                        state.heap[index] = {state.heap[index2].first, state.heap[index2].second + value};
                     }
                     _states.insert(state);
                 }
                 context.states = _states;
-                _integer->value *= 4;
             }
             else {
-                int index = getVariableIndex(identifier, this, context);
                 std::set <State> _states;
                 for (State state : context.states) {
                     state.heap[index] = {-1, 0};
@@ -387,7 +503,6 @@ void Assignment::Validate(VLContext &context) {
             }
         }
         else {
-            int index = getVariableIndex(identifier, this, context);
             std::set <State> _states;
             for (State state : context.states) {
                 state.heap[index] = {-1, 0};
@@ -469,9 +584,19 @@ void Assumption::Validate(VLContext &context) {
                     _states.insert(state);
                 }
                 else {
-                    state.heap[index1] = {state.heap[index2].first, state.heap[index2].second + EvaluateExpression(left, context)};
+                    int value;
+                    bool good = EvaluateExpression(left, context, value);
+                    if (!good) {
+                        throw AliasException("Could not evaluate compile time constant", left.get());
+                    }
+                    state.heap[index1] = {state.heap[index2].first, state.heap[index2].second + value};
                     _states.insert(state);
-                    state.heap[index1] = {state.heap[index2].first, state.heap[index2].second + EvaluateExpression(right, context)};
+
+                    good = EvaluateExpression(right, context, value);
+                    if (!good) {
+                        throw AliasException("Could not evaluate compile time constant", right.get());
+                    }
+                    state.heap[index1] = {state.heap[index2].first, state.heap[index2].second + value};
                     _states.insert(state);
                 }
             }
@@ -487,7 +612,7 @@ void Assumption::Validate(VLContext &context) {
 }
 
 void Identifier::Validate(VLContext &context) {
-    getVariableIndex(identifier, this, context);
+    checkIdentifier(identifier, this, context);
 }
 
 void Integer::Validate(VLContext &context) {
@@ -500,6 +625,9 @@ void Alloc::Validate(VLContext &context) {
 void Free::Validate(VLContext &context) {
     if (auto _identifier = std::dynamic_pointer_cast <AST::Identifier> (arg)) {
         int index = getVariableIndex(_identifier->identifier, this, context);
+        if (context.variable_is_const_stack[index]) {
+            throw AliasException("Const values can not be changed", this);
+        }
         int packet_id = -1;
         for (State state : context.states) {
             if (state.heap[index].first == -1 || state.heap[index].second != 0) {
@@ -532,10 +660,16 @@ void Free::Validate(VLContext &context) {
 void FunctionCall::Validate(VLContext &context) {
     std::shared_ptr <FunctionSignature> _signature = getFunctionSignature(identifier, this, context);
 
-    size_t old_metavariable_stack_size = context.metavariable_stack.size();
-    for (std::pair <std::string, int> p : metavariables) {
-        context.metavariable_stack.push_back(p);
+    std::vector < std::pair <std::string, int> > metavariable_stack;
+    for (std::pair <std::string, std::shared_ptr <Expression>> p : metavariables) {
+        int value;
+        bool good = EvaluateExpression(p.second, context, value);
+        if (!good) {
+            throw AliasException("Could not evaluate compile time constant", p.second.get());
+        }
+        metavariable_stack.push_back({p.first, value});
     }
+    swap(context.metavariable_stack, metavariable_stack);
 
     std::shared_ptr <FunctionSignatureEvaluated> signature = EvaluateFunctionSignature(_signature, context);
 
@@ -544,9 +678,7 @@ void FunctionCall::Validate(VLContext &context) {
         ValidateFunctionDefinition(*function_definition, context);
     }
 
-    while(context.metavariable_stack.size() > old_metavariable_stack_size) {
-        context.metavariable_stack.pop_back();
-    }
+    context.metavariable_stack = metavariable_stack;
 
     if (signature->identifiers.size() != arguments.size()) {
         throw AliasException("Incorrect number of arguments in function call", this);
@@ -569,7 +701,9 @@ void FunctionCall::Validate(VLContext &context) {
                     }
                 }
                 else {
-                    if (state.heap[index].first == -1 || state.heap[index].second != 0 || context.packet_size[state.heap[index].first] < signature->size_in[i]) {
+                    if (state.heap[index].first == -1 || 
+                        signature->is_const[i] && (context.packet_size[state.heap[index].first] - state.heap[index].second < signature->size_in[i]) ||
+                        !signature->is_const[i] && (state.heap[index].second != 0 || context.packet_size[state.heap[index].first] < signature->size_in[i])) {
                         throw AliasException("Function pre condition failed", this);
                     }
                     if (packet_num[i] == -2) {
@@ -585,7 +719,7 @@ void FunctionCall::Validate(VLContext &context) {
 
     std::vector <int> new_packet(n);
     for (int i = 0; i < n; i++) {
-        if (signature->types[i] == Type::Ptr) {
+        if (signature->types[i] == Type::Ptr && !signature->is_const[i]) {
             if (packet_num[i] >= 0) {
                 context.packet_size[packet_num[i]] = 0;
             }
@@ -597,7 +731,7 @@ void FunctionCall::Validate(VLContext &context) {
     std::set <State> _states;
     for (State state : context.states) {
         for (int i = 0; i < n; i++) {
-            if (getVariableType(arguments[i], this, context) == Type::Ptr) {
+            if (signature->types[i] == Type::Ptr && !signature->is_const[i]) {
                 int index = getVariableIndex(arguments[i], this, context);
                 for (int j = 0; j < (int)state.heap.size(); j++) {
                     if (j != index && packet_num[i] >= 0 && state.heap[j].first == packet_num[i]) {
@@ -649,6 +783,11 @@ void Subtraction::Validate(VLContext &context) {
 }
 
 void Multiplication::Validate(VLContext &context) {
+    left->Validate(context);
+    right->Validate(context);
+}
+
+void Division::Validate(VLContext &context) {
     left->Validate(context);
     right->Validate(context);
 }

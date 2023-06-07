@@ -132,6 +132,11 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
             i += 3;
             position += 3;
         }
+        else if (is_reserved_word(str, "const", i)) {
+            token_stream.push_back(Token(TokenType::Const, line, position, line, position + 4, filename));
+            i += 5;
+            position += 5;
+        }
         else if (is_reserved_word(str, "assume", i)) {
             token_stream.push_back(Token(TokenType::Assume, line, position, line, position + 5, filename));
             i += 6;
@@ -218,7 +223,8 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
             position += 1;
         }
         else if (i + 1 <= str.size() && str.substr(i, 1) == "-") {
-            if (i + 2 <= str.size() && is_digit(str[i + 1])) {
+            if (i + 2 <= str.size() && is_digit(str[i + 1]) && 
+               (token_stream.empty() || (token_stream.back().type != TokenType::Integer && token_stream.back().type != TokenType::Identifier))) {
                 int l = i;
                 i++;
                 i++;
@@ -235,6 +241,12 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
         }
         else if (i + 1 <= str.size() && str.substr(i, 1) == "*") {
             token_stream.push_back(Token(TokenType::Mult, line, position, line, position, filename));
+            i += 1;
+            position += 1;
+        }
+        else if (i + 1 <= str.size() && str.substr(i, 1) == "/" && (i + 2 > str.size() || 
+            (str.substr(i + 1, 1) != "/" && str.substr(i + 1, 1) != "*"))) {
+            token_stream.push_back(Token(TokenType::Div, line, position, line, position, filename));
             i += 1;
             position += 1;
         }
