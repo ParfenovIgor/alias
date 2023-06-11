@@ -8,9 +8,9 @@
 namespace Syntax {
     class TokenStream {
     private:
-    public:
         std::vector <Token> stream;
         int pos;
+    public:
         TokenStream(std::vector <Token> _stream) {
             stream = _stream;
             pos = 0;

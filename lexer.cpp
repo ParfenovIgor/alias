@@ -28,12 +28,12 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
             i += 3;
             position += 3;
             while (i < (int)str.size() && str[i] != '{') {
-                i++;
-                position++;
                 if (str[i] == '\n') {
                     position = -1;
                     line++;
                 }
+                i++;
+                position++;
             }
             if (i == (int)str.size()) {
                 throw AliasException("{ expected after asm", line_begin, position_begin, line, position, filename);
@@ -43,12 +43,12 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
             std::string code;
             while (i < (int)str.size() && str[i] != '}') {
                 code.push_back(str[i]);
-                i++;
-                position++;
                 if (str[i] == '\n') {
                     position = -1;
                     line++;
                 }
+                i++;
+                position++;
             }
             if (i == (int)str.size()) {
                 throw AliasException("} expected after asm", line_begin, position_begin, line, position, filename);
@@ -63,12 +63,12 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
             i += 7;
             position += 7;
             while (i < (int)str.size() && str[i] != '{') {
-                i++;
-                position++;
                 if (str[i] == '\n') {
                     position = -1;
                     line++;
                 }
+                i++;
+                position++;
             }
             if (i == (int)str.size()) {
                 throw AliasException("{ expected after include", line_begin, position_begin, line, position, filename);
@@ -78,12 +78,12 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
             std::string code;
             while (i < (int)str.size() && str[i] != '}') {
                 code.push_back(str[i]);
-                i++;
-                position++;
                 if (str[i] == '\n') {
                     position = -1;
                     line++;
                 }
+                i++;
+                position++;
             }
             if (i == (int)str.size()) {
                 throw AliasException("} expected after include", line_begin, position_begin, line, position, filename);
@@ -172,6 +172,11 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
             i += 1;
             position += 1;
         }
+        else if (i + 1 <= str.size() && str.substr(i, 1) == ":") {
+            token_stream.push_back(Token(TokenType::Colon, line, position, line, position, filename));
+            i += 1;
+            position += 1;
+        }
         else if (i + 1 <= str.size() && str.substr(i, 1) == ";") {
             token_stream.push_back(Token(TokenType::Semicolon, line, position, line, position, filename));
             i += 1;
@@ -226,8 +231,7 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
             if (i + 2 <= str.size() && is_digit(str[i + 1]) && 
                (token_stream.empty() || (token_stream.back().type != TokenType::Integer && token_stream.back().type != TokenType::Identifier))) {
                 int l = i;
-                i++;
-                i++;
+                i += 2;
                 while (i + 1 <= str.size() && is_digit(str[i])) i++;
                 int r = i - 1;
                 token_stream.push_back(Token(TokenType::Integer, atoi(str.substr(l, r - l + 1).c_str()), line, position, line, position + r - l, filename));
@@ -349,12 +353,12 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
                     }
                 }
                 buffer.push_back(str[i]);
-                i++;
-                position++;
                 if (str[i] == '\n') {
                     position = -1;
                     line++;
                 }
+                i++;
+                position++;
             }
             if (i == (int)str.size()) {
                 throw AliasException("\" expected after string", line_begin, position_begin, line, position, filename);

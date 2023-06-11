@@ -87,6 +87,7 @@ void Block::Compile(std::ostream &out, CPContext &context) {
     for (auto i = statement_list.begin(); i != statement_list.end(); i++) {
         (*i)->Compile(out, context);
     }
+    out << "add esp, " << 4 * (context.variable_stack.size() - old_variable_stack_size) << "\n";
     while (context.variable_stack.size() > old_variable_stack_size)
         context.variable_stack.pop_back();
     while (context.variable_stack_type.size() > old_variable_stack_size)
@@ -195,10 +196,28 @@ void Assignment::Compile(std::ostream &out, CPContext &context) {
         if (auto _addition = std::dynamic_pointer_cast <AST::Addition> (value)) {
             auto _identifier = std::dynamic_pointer_cast <AST::Identifier> (_addition->left);
             if (_identifier && getVariableType(_identifier->identifier, this, context) == Type::Ptr) {
+                int line_begin = _addition->right->line_begin;
+                int position_begin = _addition->right->position_begin;
+                int line_end = _addition->right->line_end;
+                int position_end = _addition->right->position_end;
+                std::string filename = _addition->right->filename;
+
                 auto _multiplication = std::make_shared <AST::Multiplication> ();
+                _multiplication->line_begin = line_begin;
+                _multiplication->position_begin = position_begin;
+                _multiplication->line_end = line_end;
+                _multiplication->position_end = position_end;
+                _multiplication->filename = filename;
+
+                auto _integer  = std::make_shared <AST::Integer> ();
+                _integer->line_begin = line_begin;
+                _integer->position_begin = position_begin;
+                _integer->line_end = line_end;
+                _integer->position_end = position_end;
+                _integer->filename = filename;
+                
                 _multiplication->left = _addition->right;
                 _addition->right = _multiplication;
-                auto _integer  = std::make_shared <AST::Integer> ();
                 _integer->value = 4;
                 _multiplication->right = _integer;
             }
@@ -304,10 +323,28 @@ void Integer::Compile(std::ostream &out, CPContext &context) {
 }
 
 void Alloc::Compile(std::ostream &out, CPContext &context) {
+    int line_begin = expression->line_begin;
+    int position_begin = expression->position_begin;
+    int line_end = expression->line_end;
+    int position_end = expression->position_end;
+    std::string filename = expression->filename;
+
     auto _multiplication = std::make_shared <AST::Multiplication> ();
-    _multiplication->left = expression;
+    _multiplication->line_begin = line_begin;
+    _multiplication->position_begin = position_begin;
+    _multiplication->line_end = line_end;
+    _multiplication->position_end = position_end;
+    _multiplication->filename = filename;
+
     auto _integer  = std::make_shared <AST::Integer> ();
+    _integer->line_begin = line_begin;
+    _integer->position_begin = position_begin;
+    _integer->line_end = line_end;
+    _integer->position_end = position_end;
+    _integer->filename = filename;
+
     _integer->value = 4;
+    _multiplication->left = expression;
     _multiplication->right = _integer;
     expression = _multiplication;
 

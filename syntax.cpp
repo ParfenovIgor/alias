@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <functional>
 #include "syntax.h"
 #include "exception.h"
 #include "process.h"
@@ -70,86 +71,172 @@ namespace Syntax {
     }
 
     std::shared_ptr <AST::Expression> ProcessExpression(TokenStream &ts) {
-        std::shared_ptr <AST::Expression> _expression1 = ProcessPrimary(ts);
-        if (ts.GetToken().type == TokenType::Plus) {
+        enum class Operation {
+            Unary,
+            Binary,
+            Parenthesis
+        };
+        std::vector < std::shared_ptr <AST::Expression> > primaries;
+        std::vector < std::pair <Token, Operation> > operations;
+
+        std::function <bool()> next_is_operation = [&]() {
+            if (ts.GetToken().type == TokenType::Plus ||
+                ts.GetToken().type == TokenType::Minus ||
+                ts.GetToken().type == TokenType::Mult ||
+                ts.GetToken().type == TokenType::Div ||
+                ts.GetToken().type == TokenType::Less ||
+                ts.GetToken().type == TokenType::Equal)
+                return true;
+            else
+                return false;
+        };
+
+        std::function <int(std::pair <Token, Operation>)> operation_priority = [&](std::pair <Token, Operation> operation) {
+            Token token = operation.first;
+            if (token.type == TokenType::Mult ||
+                token.type == TokenType::Div)
+                return 1;
+            if (token.type == TokenType::Plus ||
+                token.type == TokenType::Minus)
+                return 2;
+            if (token.type == TokenType::Less ||
+                token.type == TokenType::Equal)
+                return 3;
+            return 4;
+        };
+
+        std::function <void()> process_operation = [&]() {
+            if (operations.back().second == Operation::Binary) {
+                std::shared_ptr <AST::BinaryOperation> root;
+                if (operations.back().first.type == TokenType::Plus)
+                    root = std::make_shared <AST::Addition> ();
+                if (operations.back().first.type == TokenType::Minus)
+                    root = std::make_shared <AST::Subtraction> ();
+                if (operations.back().first.type == TokenType::Mult)
+                    root = std::make_shared <AST::Multiplication> ();
+                if (operations.back().first.type == TokenType::Div)
+                    root = std::make_shared <AST::Division> ();
+                if (operations.back().first.type == TokenType::Less)
+                    root = std::make_shared <AST::Less> ();
+                if (operations.back().first.type == TokenType::Equal)
+                    root = std::make_shared <AST::Equal> ();
+                if (!root) {
+                    throw AliasException("Binary operator expected in expression", ts.GetToken());
+                }
+                root->left = primaries[primaries.size() - 2];
+                root->right = primaries[primaries.size() - 1];
+                root->line_begin = root->left->line_begin;
+                root->position_begin = root->left->position_begin;
+                root->line_end= root->right->line_end;
+                root->position_end= root->right->position_end;
+                root->filename = root->left->filename;
+
+                primaries.pop_back();
+                primaries.pop_back();
+                primaries.push_back(root);
+                operations.pop_back();
+            }
+        };
+
+        int ParenthesisLevel = 0;
+        enum class State {
+            Identifier,
+            UnaryOperation,
+            BinaryOperation,
+            ParenthesisOpen,
+            ParenthesisClose
+        };
+        State CurrentState;
+        if (ts.GetToken().type == TokenType::ParenthesisOpen) {
+            operations.push_back({ts.GetToken(), Operation::Parenthesis});
             ts.NextToken();
-            std::shared_ptr <AST::Expression> _expression2 = ProcessExpression(ts);
-            std::shared_ptr <AST::Addition> _addition = std::make_shared <AST::Addition> ();
-            _addition->left = _expression1;
-            _addition->right = _expression2;
-            _addition->line_begin = _expression1->line_begin;
-            _addition->position_begin = _expression1->position_begin;
-            _addition->line_end= _expression2->line_end;
-            _addition->position_end= _expression2->position_end;
-            _addition->filename = _expression1->filename;
-            return _addition;
+            ParenthesisLevel++;
+            CurrentState = State::ParenthesisOpen;
         }
-        if (ts.GetToken().type == TokenType::Minus) {
+        else if (next_is_operation()) {
+            operations.push_back({ts.GetToken(), Operation::Unary});
             ts.NextToken();
-            std::shared_ptr <AST::Expression> _expression2 = ProcessExpression(ts);
-            std::shared_ptr <AST::Subtraction> _subtraction = std::make_shared <AST::Subtraction> ();
-            _subtraction->left = _expression1;
-            _subtraction->right = _expression2;
-            _subtraction->line_begin = _expression1->line_begin;
-            _subtraction->position_begin = _expression1->position_begin;
-            _subtraction->line_end= _expression2->line_end;
-            _subtraction->position_end= _expression2->position_end;
-            _subtraction->filename = _expression1->filename;
-            return _subtraction;
+            CurrentState = State::UnaryOperation;
         }
-        if (ts.GetToken().type == TokenType::Mult) {
-            ts.NextToken();
-            std::shared_ptr <AST::Expression> _expression2 = ProcessExpression(ts);
-            std::shared_ptr <AST::Multiplication> _multiplication = std::make_shared <AST::Multiplication> ();
-            _multiplication->left = _expression1;
-            _multiplication->right = _expression2;
-            _multiplication->line_begin = _expression1->line_begin;
-            _multiplication->position_begin = _expression1->position_begin;
-            _multiplication->line_end= _expression2->line_end;
-            _multiplication->position_end= _expression2->position_end;
-            _multiplication->filename = _expression1->filename;
-            return _multiplication;
+        else {
+            primaries.push_back(ProcessPrimary(ts));
+            CurrentState = State::Identifier;
         }
-        if (ts.GetToken().type == TokenType::Div) {
-            ts.NextToken();
-            std::shared_ptr <AST::Expression> _expression2 = ProcessExpression(ts);
-            std::shared_ptr <AST::Division> _division = std::make_shared <AST::Division> ();
-            _division->left = _expression1;
-            _division->right = _expression2;
-            _division->line_begin = _expression1->line_begin;
-            _division->position_begin = _expression1->position_begin;
-            _division->line_end= _expression2->line_end;
-            _division->position_end= _expression2->position_end;
-            _division->filename = _expression1->filename;
-            return _division;
+
+        while (CurrentState == State::UnaryOperation ||
+               CurrentState == State::BinaryOperation ||
+               CurrentState == State::ParenthesisOpen ||
+               next_is_operation() ||
+               ParenthesisLevel) {
+            if (ts.GetToken().type == TokenType::ParenthesisOpen) {
+                if (CurrentState != State::BinaryOperation &&
+                    CurrentState != State::ParenthesisOpen) {
+                    throw AliasException("Unexpected ( in expression", ts.GetToken());
+                }
+                operations.push_back({ts.GetToken(), Operation::Parenthesis});
+                ts.NextToken();
+                ParenthesisLevel++;
+                CurrentState = State::ParenthesisOpen;
+            }
+            else if (ts.GetToken().type == TokenType::ParenthesisClose) {
+                if (CurrentState != State::Identifier &&
+                    CurrentState != State::ParenthesisClose) {
+                    throw AliasException("Unexpected ) in expression", ts.GetToken());
+                }
+                while (!operations.empty() && operations.back().first.type != TokenType::ParenthesisOpen) {
+                    process_operation();
+                }
+                if (operations.empty() || operations.back().first.type != TokenType::ParenthesisOpen) {
+                    throw AliasException(") exprected in expression", ts.GetToken());
+                }
+                operations.pop_back();
+                ts.NextToken();
+                ParenthesisLevel--;
+                CurrentState = State::ParenthesisClose;
+            }
+            else if (next_is_operation()) {
+                if (CurrentState == State::UnaryOperation ||
+                    CurrentState == State::BinaryOperation ||
+                    CurrentState == State::ParenthesisOpen) {
+                    while(!operations.empty() &&
+                          operation_priority(operations.back()) <= operation_priority({ts.GetToken(), Operation::Unary})) {
+                        process_operation();
+                    }
+                    operations.push_back({ts.GetToken(), Operation::Unary});
+                    ts.NextToken();
+                    CurrentState = State::UnaryOperation;
+                }
+                else if (CurrentState == State::Identifier ||
+                         CurrentState == State::ParenthesisClose) {
+                    while(!operations.empty() &&
+                            operation_priority(operations.back()) <= operation_priority({ts.GetToken(), Operation::Binary})) {
+                        process_operation();
+                    }
+                    CurrentState = State::BinaryOperation;
+                    operations.push_back({ts.GetToken(), Operation::Binary});
+                    ts.NextToken();
+                }
+            }
+            else {
+                if (CurrentState != State::UnaryOperation &&
+                    CurrentState != State::BinaryOperation &&
+                    CurrentState != State::ParenthesisOpen) {
+                    throw AliasException("Unexpected identifier in expression", ts.GetToken());
+                }
+                primaries.push_back(ProcessPrimary(ts));
+                CurrentState = State::Identifier;
+            }
         }
-        if (ts.GetToken().type == TokenType::Less) {
-            ts.NextToken();
-            std::shared_ptr <AST::Expression> _expression2 = ProcessExpression(ts);
-            std::shared_ptr <AST::Less> _less = std::make_shared <AST::Less> ();
-            _less->left = _expression1;
-            _less->right = _expression2;
-            _less->line_begin = _expression1->line_begin;
-            _less->position_begin = _expression1->position_begin;
-            _less->line_end= _expression2->line_end;
-            _less->position_end= _expression2->position_end;
-            _less->filename = _expression1->filename;
-            return _less;
+
+        while(!operations.empty()) {
+            process_operation();
         }
-        if (ts.GetToken().type == TokenType::Equal) {
-            ts.NextToken();
-            std::shared_ptr <AST::Expression> _expression2 = ProcessExpression(ts);
-            std::shared_ptr <AST::Equal> _equal = std::make_shared <AST::Equal> ();
-            _equal->left = _expression1;
-            _equal->right = _expression2;
-            _equal->line_begin = _expression1->line_begin;
-            _equal->position_begin = _expression1->position_begin;
-            _equal->line_end= _expression2->line_end;
-            _equal->position_end= _expression2->position_end;
-            _equal->filename = _expression1->filename;
-            return _equal;
+
+        if (primaries.size() != 1) {
+            throw AliasException("Incorrect expression", ts.GetToken());
         }
-        return _expression1;
+
+        return primaries[0];
     }
 
     std::shared_ptr <AST::Expression> ProcessPrimary(TokenStream &ts) {
@@ -373,6 +460,10 @@ namespace Syntax {
                         function_signature->is_const.push_back(false);
                     }
                     auto _expression1 = ProcessExpression(ts);
+                    if (ts.GetToken().type != TokenType::Colon) {
+                        throw AliasException(": expected in argument list", ts.GetToken());
+                    }
+                    ts.NextToken();
                     auto _expression2 = ProcessExpression(ts);
                     function_signature->size_in.push_back(_expression1);
                     function_signature->size_out.push_back(_expression2);
@@ -458,6 +549,10 @@ namespace Syntax {
                     function_signature->types.push_back(AST::Type::Ptr);
                     ts.NextToken();
                     auto _expression1 = ProcessExpression(ts);
+                    if (ts.GetToken().type != TokenType::Colon) {
+                        throw AliasException(": expected in argument list", ts.GetToken());
+                    }
+                    ts.NextToken();
                     auto _expression2 = ProcessExpression(ts);
                     function_signature->size_in.push_back(_expression1);
                     function_signature->size_out.push_back(_expression2);
@@ -518,6 +613,10 @@ namespace Syntax {
             _assumption->identifier = ts.GetToken().value_string;
             ts.NextToken();
             _assumption->left = ProcessExpression(ts);
+            if (ts.GetToken().type != TokenType::Colon) {
+                throw AliasException(": expected in assume condition", ts.GetToken());
+            }
+            ts.NextToken();
             _assumption->right = ProcessExpression(ts);
             if (ts.GetToken().type != TokenType::ParenthesisClose) {
                 throw AliasException(") expected in assume condition", ts.GetToken());

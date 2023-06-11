@@ -12,6 +12,7 @@ enum class TokenType {
     Asm,
     Include,
     Comma,
+    Colon,
     Semicolon,
     Int,
     Ptr,

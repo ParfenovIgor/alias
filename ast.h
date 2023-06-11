@@ -65,6 +65,7 @@ struct VLContext {
     std::vector < std::string > function_stack;
     std::vector < std::shared_ptr <FunctionSignature> > function_signature_stack;
     std::vector <FunctionDefinition*> function_pointer_stack;
+    std::vector < std::set <FunctionSignatureEvaluated> > function_signature_validated;
     std::vector <int> packet_size;
     std::set <State> states;
     std::vector < std::pair <std::string, int> > metavariable_stack;
@@ -230,44 +231,44 @@ public:
     void Compile(std::ostream &out, CPContext &context);
 };
 
-class Addition : public Expression {
+class BinaryOperation : public Expression {
 public:
     std::shared_ptr <Expression> left, right;
+    virtual ~BinaryOperation() {}
+};
+
+class Addition : public BinaryOperation {
+public:
     void Validate(VLContext &context);
     void Compile(std::ostream &out, CPContext &context);
 };
 
-class Subtraction : public Expression {
+class Subtraction : public BinaryOperation {
 public:
-    std::shared_ptr <Expression> left, right;
     void Validate(VLContext &context);
     void Compile(std::ostream &out, CPContext &context);
 };
 
-class Multiplication : public Expression {
+class Multiplication : public BinaryOperation {
 public:
-    std::shared_ptr <Expression> left, right;
     void Validate(VLContext &context);
     void Compile(std::ostream &out, CPContext &context);
 };
 
-class Division : public Expression {
+class Division : public BinaryOperation {
 public:
-    std::shared_ptr <Expression> left, right;
     void Validate(VLContext &context);
     void Compile(std::ostream &out, CPContext &context);
 };
 
-class Less : public Expression {
+class Less : public BinaryOperation {
 public:
-    std::shared_ptr <Expression> left, right;
     void Validate(VLContext &context);
     void Compile(std::ostream &out, CPContext &context);
 };
 
-class Equal : public Expression {
+class Equal : public BinaryOperation {
 public:
-    std::shared_ptr <Expression> left, right;
     void Validate(VLContext &context);
     void Compile(std::ostream &out, CPContext &context);
 };

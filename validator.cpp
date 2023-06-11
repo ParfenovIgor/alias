@@ -16,6 +16,10 @@ bool operator == (const State &a, const State &b) {
     return a.heap == b.heap;
 }
 
+bool operator <(const FunctionSignatureEvaluated &a, const FunctionSignatureEvaluated &b) {
+    return a.size_in < b.size_in || (a.size_in == b.size_in && a.size_out < b.size_out);
+}
+
 int getVariableIndex(std::string id, Node *node, VLContext &context) {
     for (int i = (int)context.variable_stack.size() - 1; i >= 0; i--) {
         if (context.variable_stack[i] == id) {
@@ -57,10 +61,10 @@ std::shared_ptr <FunctionSignature> getFunctionSignature(std::string id, Node *n
     throw AliasException("Identifier was not declared in this scope", node);
 }
 
-FunctionDefinition* getFunctionPointer(std::string id, Node *node, VLContext &context) {
+int getFunctionIndex(std::string id, Node *node, VLContext &context) {
     for (int i = (int)context.function_stack.size() - 1; i >= 0; i--) {
         if (context.function_stack[i] == id) {
-            return context.function_pointer_stack[i];
+            return i;
         }
     }
     throw AliasException("Identifier was not declared in this scope", node);
@@ -201,6 +205,7 @@ void ValidateFunctionDefinition(FunctionDefinition &function, VLContext &context
     context.function_stack = _context.function_stack;
     context.function_signature_stack = _context.function_signature_stack;
     context.function_pointer_stack = _context.function_pointer_stack;
+    context.function_signature_validated = _context.function_signature_validated;
     context.metavariable_stack = _context.metavariable_stack;
 
     std::shared_ptr <FunctionSignatureEvaluated> signature = EvaluateFunctionSignature(function.signature, context);
@@ -341,6 +346,7 @@ void Block::Validate(VLContext &context) {
         context.function_stack.pop_back();
         context.function_signature_stack.pop_back();
         context.function_pointer_stack.pop_back();
+        context.function_signature_validated.pop_back();
     }
 }
 
@@ -421,6 +427,7 @@ void FunctionDefinition::Validate(VLContext &context) {
     context.function_stack.push_back(name);
     context.function_signature_stack.push_back(signature);
     context.function_pointer_stack.push_back(this);
+    context.function_signature_validated.push_back({});
 
     if (name == "main" && external) {
         ValidateFunctionDefinition(*this, context);
@@ -431,6 +438,7 @@ void Prototype::Validate(VLContext &context) {
     context.function_stack.push_back(name);
     context.function_signature_stack.push_back(signature);
     context.function_pointer_stack.push_back(nullptr);
+    context.function_signature_validated.push_back({});
 }
 
 void Definition::Validate(VLContext &context) {
@@ -673,9 +681,12 @@ void FunctionCall::Validate(VLContext &context) {
 
     std::shared_ptr <FunctionSignatureEvaluated> signature = EvaluateFunctionSignature(_signature, context);
 
-    FunctionDefinition *function_definition = getFunctionPointer(identifier, this, context);
-    if (function_definition) {
-        ValidateFunctionDefinition(*function_definition, context);
+    int index = getFunctionIndex(identifier, this, context);
+    if (context.function_signature_validated[index].find(*signature.get()) == context.function_signature_validated[index].end()){
+        if(context.function_pointer_stack[index]) {
+            ValidateFunctionDefinition(*context.function_pointer_stack[index], context);
+        }
+        context.function_signature_validated[index].insert(*signature.get());
     }
 
     context.metavariable_stack = metavariable_stack;
