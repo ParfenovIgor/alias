@@ -1,5 +1,5 @@
-#ifndef STATE_H_INCLUDED
-#define STATE_H_INCLUDED
+#ifndef SETTINGS_H_INCLUDED
+#define SETTINGS_H_INCLUDED
 
 #include <string>
 
@@ -20,4 +20,4 @@ namespace Settings {
     void SetOutputFilename(std::string state);
 }
 
-#endif // STATE_H_INCLUDED
+#endif // SETTINGS_H_INCLUDED

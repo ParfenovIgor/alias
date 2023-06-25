@@ -27,9 +27,11 @@ class Alloc;
 class Free;
 class FunctionCall;
 class Dereference;
+class BinaryOperation;
 class Addition;
 class Subtraction;
 class Multiplication;
+class Division;
 class Less;
 class Equal;
 

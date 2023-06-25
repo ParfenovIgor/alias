@@ -273,19 +273,6 @@ void ValidateFunctionDefinition(FunctionDefinition &function, VLContext &context
     context = _context;
 }
 
-void printStates(std::set <State> states) {
-    std::cout << "{" << std::endl;
-    for (State state : states) {
-        std::cout << "[ ";
-        for (std::pair <int,int> p : state.heap) {
-            std::cout << "(" << p.first << ", " << p.second << ") ";
-        }
-        std::cout << "]" << std::endl;
-    }
-    std::cout << "}" << std::endl;
-    std::cout << "____________________" << std::endl;
-}
-
 void PrintStatesLog() {
     std::cout << "States" << std::endl;
     for (auto v : states_log) {

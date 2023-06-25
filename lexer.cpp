@@ -21,13 +21,14 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
 
     std::vector <Token> token_stream;
     int line = 0, position = 0;
-    for (size_t i = 0; i < str.size();) {
+    int N = str.size();
+    for (int i = 0; i < N;) {
         if (is_reserved_word(str, "asm", i)) {
             int line_begin = line;
             int position_begin = position;
             i += 3;
             position += 3;
-            while (i < (int)str.size() && str[i] != '{') {
+            while (i < N && str[i] != '{') {
                 if (str[i] == '\n') {
                     position = -1;
                     line++;
@@ -35,13 +36,13 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
                 i++;
                 position++;
             }
-            if (i == (int)str.size()) {
+            if (i == N) {
                 throw AliasException("{ expected after asm", line_begin, position_begin, line, position, filename);
             }
             position++;
             i++;
             std::string code;
-            while (i < (int)str.size() && str[i] != '}') {
+            while (i < N && str[i] != '}') {
                 code.push_back(str[i]);
                 if (str[i] == '\n') {
                     position = -1;
@@ -50,7 +51,7 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
                 i++;
                 position++;
             }
-            if (i == (int)str.size()) {
+            if (i == N) {
                 throw AliasException("} expected after asm", line_begin, position_begin, line, position, filename);
             }
             token_stream.push_back(Token(TokenType::Asm, code, line_begin, position_begin, line, position, filename));
@@ -62,7 +63,7 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
             int position_begin = position;
             i += 7;
             position += 7;
-            while (i < (int)str.size() && str[i] != '{') {
+            while (i < N && str[i] != '{') {
                 if (str[i] == '\n') {
                     position = -1;
                     line++;
@@ -70,13 +71,13 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
                 i++;
                 position++;
             }
-            if (i == (int)str.size()) {
+            if (i == N) {
                 throw AliasException("{ expected after include", line_begin, position_begin, line, position, filename);
             }
             position++;
             i++;
             std::string code;
-            while (i < (int)str.size() && str[i] != '}') {
+            while (i < N && str[i] != '}') {
                 code.push_back(str[i]);
                 if (str[i] == '\n') {
                     position = -1;
@@ -85,7 +86,7 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
                 i++;
                 position++;
             }
-            if (i == (int)str.size()) {
+            if (i == N) {
                 throw AliasException("} expected after include", line_begin, position_begin, line, position, filename);
             }
             token_stream.push_back(Token(TokenType::Include, code, line_begin, position_begin, line, position, filename));
@@ -157,82 +158,82 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
             i += 4;
             position += 4;
         }
-        else if (i + 2 <= str.size() && str.substr(i, 2) == ":=") {
+        else if (i + 2 <= N && str.substr(i, 2) == ":=") {
             token_stream.push_back(Token(TokenType::Assign, line, position, line, position + 1, filename));
             i += 2;
             position += 2;
         }
-        else if (i + 2 <= str.size() && str.substr(i, 2) == "<-") {
+        else if (i + 2 <= N && str.substr(i, 2) == "<-") {
             token_stream.push_back(Token(TokenType::Move, line, position, line, position + 1, filename));
             i += 2;
             position += 2;
         }
-        else if (i + 1 <= str.size() && str.substr(i, 1) == ",") {
+        else if (i + 1 <= N && str.substr(i, 1) == ",") {
             token_stream.push_back(Token(TokenType::Comma, line, position, line, position, filename));
             i += 1;
             position += 1;
         }
-        else if (i + 1 <= str.size() && str.substr(i, 1) == ":") {
+        else if (i + 1 <= N && str.substr(i, 1) == ":") {
             token_stream.push_back(Token(TokenType::Colon, line, position, line, position, filename));
             i += 1;
             position += 1;
         }
-        else if (i + 1 <= str.size() && str.substr(i, 1) == ";") {
+        else if (i + 1 <= N && str.substr(i, 1) == ";") {
             token_stream.push_back(Token(TokenType::Semicolon, line, position, line, position, filename));
             i += 1;
             position += 1;
         }
-        else if (i + 1 <= str.size() && str.substr(i, 1) == "{") {
+        else if (i + 1 <= N && str.substr(i, 1) == "{") {
             token_stream.push_back(Token(TokenType::BraceOpen, line, position, line, position, filename));
             i += 1;
             position += 1;
         }
-        else if (i + 1 <= str.size() && str.substr(i, 1) == "}") {
+        else if (i + 1 <= N && str.substr(i, 1) == "}") {
             token_stream.push_back(Token(TokenType::BraceClose, line, position, line, position, filename));
             i += 1;
             position += 1;
         }
-        else if (i + 1 <= str.size() && str.substr(i, 1) == "(") {
+        else if (i + 1 <= N && str.substr(i, 1) == "(") {
             token_stream.push_back(Token(TokenType::ParenthesisOpen, line, position, line, position, filename));
             i += 1;
             position += 1;
         }
-        else if (i + 1 <= str.size() && str.substr(i, 1) == ")") {
+        else if (i + 1 <= N && str.substr(i, 1) == ")") {
             token_stream.push_back(Token(TokenType::ParenthesisClose, line, position, line, position, filename));
             i += 1;
             position += 1;
         }
-        else if (i + 1 <= str.size() && str.substr(i, 1) == "[") {
+        else if (i + 1 <= N && str.substr(i, 1) == "[") {
             token_stream.push_back(Token(TokenType::BracketOpen, line, position, line, position, filename));
             i += 1;
             position += 1;
         }
-        else if (i + 1 <= str.size() && str.substr(i, 1) == "]") {
+        else if (i + 1 <= N && str.substr(i, 1) == "]") {
             token_stream.push_back(Token(TokenType::BracketClose, line, position, line, position, filename));
             i += 1;
             position += 1;
         }
-        else if (i + 1 <= str.size() && str.substr(i, 1) == "$") {
+        else if (i + 1 <= N && str.substr(i, 1) == "$") {
             token_stream.push_back(Token(TokenType::Dereference, line, position, line, position, filename));
             i += 1;
             position += 1;
         }
-        else if (i + 1 <= str.size() && str.substr(i, 1) == "^") {
+        else if (i + 1 <= N && str.substr(i, 1) == "^") {
             token_stream.push_back(Token(TokenType::Caret, line, position, line, position, filename));
             i += 1;
             position += 1;
         }
-        else if (i + 1 <= str.size() && str.substr(i, 1) == "+") {
+        else if (i + 1 <= N && str.substr(i, 1) == "+") {
             token_stream.push_back(Token(TokenType::Plus, line, position, line, position, filename));
             i += 1;
             position += 1;
         }
-        else if (i + 1 <= str.size() && str.substr(i, 1) == "-") {
-            if (i + 2 <= str.size() && is_digit(str[i + 1]) && 
+        else if (i + 1 <= N && str.substr(i, 1) == "-") {
+            if (i + 2 <= N && is_digit(str[i + 1]) && 
                (token_stream.empty() || (token_stream.back().type != TokenType::Integer && token_stream.back().type != TokenType::Identifier))) {
                 int l = i;
                 i += 2;
-                while (i + 1 <= str.size() && is_digit(str[i])) i++;
+                while (i + 1 <= N && is_digit(str[i])) i++;
                 int r = i - 1;
                 token_stream.push_back(Token(TokenType::Integer, atoi(str.substr(l, r - l + 1).c_str()), line, position, line, position + r - l, filename));
                 position += r - l + 1;
@@ -243,38 +244,38 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
                 position += 1;
             }
         }
-        else if (i + 1 <= str.size() && str.substr(i, 1) == "*") {
+        else if (i + 1 <= N && str.substr(i, 1) == "*") {
             token_stream.push_back(Token(TokenType::Mult, line, position, line, position, filename));
             i += 1;
             position += 1;
         }
-        else if (i + 1 <= str.size() && str.substr(i, 1) == "/" && (i + 2 > str.size() || 
+        else if (i + 1 <= N && str.substr(i, 1) == "/" && (i + 2 > N || 
             (str.substr(i + 1, 1) != "/" && str.substr(i + 1, 1) != "*"))) {
             token_stream.push_back(Token(TokenType::Div, line, position, line, position, filename));
             i += 1;
             position += 1;
         }
-        else if (i + 1 <= str.size() && str.substr(i, 1) == "<") {
+        else if (i + 1 <= N && str.substr(i, 1) == "<") {
             token_stream.push_back(Token(TokenType::Less, line, position, line, position, filename));
             i += 1;
             position += 1;
         }
-        else if (i + 1 <= str.size() && str.substr(i, 1) == "=") {
+        else if (i + 1 <= N && str.substr(i, 1) == "=") {
             token_stream.push_back(Token(TokenType::Equal, line, position, line, position, filename));
             i += 1;
             position += 1;
         }
-        else if (i + 2 <= str.size() && str.substr(i, 2) == "//") {
+        else if (i + 2 <= N && str.substr(i, 2) == "//") {
             i++;
-            while(i < str.size() && str[i] != '\n') i++;
-            i = std::min(i + 1, str.size());
+            while(i < N && str[i] != '\n') i++;
+            i = std::min(i + 1, N);
             position = 0;
             line++;
         }
-        else if (i + 2 <= str.size() && str.substr(i, 2) == "/*") {
+        else if (i + 2 <= N && str.substr(i, 2) == "/*") {
             i += 2;
             position += 2;
-            while(i + 2 <= str.size() && str.substr(i, 2) != "*/") {
+            while(i + 2 <= N && str.substr(i, 2) != "*/") {
                 i++;
                 position++;
                 if (str[i] == '\n') {
@@ -283,16 +284,16 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
                 }
             }
             position += 2;
-            i = std::min(i + 2, str.size());
+            i = std::min(i + 2, N);
         }
-        else if (i + 1 <= str.size() && str.substr(i, 1) == "\"") {
+        else if (i + 1 <= N && str.substr(i, 1) == "\"") {
             i++;
             int line_begin = line;
             int position_begin = position;
             position++;
             std::string buffer;
-            while (i < (int)str.size() && str[i] != '\"') {
-                if (str[i] == '\\' && i + 1 < str.size()) {
+            while (i < N && str[i] != '\"') {
+                if (str[i] == '\\' && i + 1 < N) {
                     bool found = false;
                     if (str[i + 1] == '0') {
                         buffer.push_back((char)0x0);
@@ -360,7 +361,7 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
                 i++;
                 position++;
             }
-            if (i == (int)str.size()) {
+            if (i == N) {
                 throw AliasException("\" expected after string", line_begin, position_begin, line, position, filename);
             }
             buffer.push_back('\0');
@@ -371,7 +372,7 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
         else if (is_digit(str[i])) {
             int l = i;
             i++;
-            while (i + 1 <= str.size() && is_digit(str[i])) i++;
+            while (i + 1 <= N && is_digit(str[i])) i++;
             int r = i - 1;
             token_stream.push_back(Token(TokenType::Integer, atoi(str.substr(l, r - l + 1).c_str()), line, position, line, position + r - l, filename));
             position += r - l + 1;
@@ -379,7 +380,7 @@ std::vector <Token> Lexer::Process(std::string str, std::string filename) {
         else if (is_alpha(str[i])) {
             int l = i;
             i++;
-            while (i + 1 <= str.size() && (is_alpha(str[i]) || is_digit(str[i]))) i++;
+            while (i + 1 <= N && (is_alpha(str[i]) || is_digit(str[i]))) i++;
             int r = i - 1;
             token_stream.push_back(Token(TokenType::Identifier, str.substr(l, r - l + 1), line, position, line, position + r - l, filename));
             position += r - l + 1;
