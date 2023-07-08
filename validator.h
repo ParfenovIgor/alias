@@ -6,7 +6,6 @@
 
 namespace AST {
     void Validate(std::shared_ptr <Node> node);
-
     void PrintStatesLog();
 }
 

@@ -6,13 +6,14 @@
 #include "exception.h"
 
 namespace AST {
-std::map < std::string, std::vector < std::pair <int, int> > > states_log;
 
-bool operator < (const State &a, const State &b) {
+std::map <std::string, std::vector <std::pair <int, int>>> states_log;
+
+bool operator <(const State &a, const State &b) {
     return a.heap < b.heap;
 }
 
-bool operator == (const State &a, const State &b) {
+bool operator ==(const State &a, const State &b) {
     return a.heap == b.heap;
 }
 
@@ -655,7 +656,7 @@ void Free::Validate(VLContext &context) {
 void FunctionCall::Validate(VLContext &context) {
     std::shared_ptr <FunctionSignature> _signature = getFunctionSignature(identifier, this, context);
 
-    std::vector < std::pair <std::string, int> > metavariable_stack;
+    std::vector <std::pair <std::string, int>> metavariable_stack;
     for (std::pair <std::string, std::shared_ptr <Expression>> p : metavariables) {
         int value;
         bool good = EvaluateExpression(p.second, context, value);

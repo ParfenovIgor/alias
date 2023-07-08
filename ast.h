@@ -7,6 +7,7 @@
 #include <memory>
 
 namespace AST {
+
 class Node;
 class Statement;
 class Block;
@@ -42,35 +43,35 @@ enum class Type {
 
 class FunctionSignature {
 public:
-    std::vector < std::string > identifiers;
+    std::vector <std::string> identifiers;
     std::vector <Type> types;
-    std::vector < std::shared_ptr <Expression> > size_in, size_out;
+    std::vector <std::shared_ptr <Expression>> size_in, size_out;
     std::vector <bool> is_const;
 };
 
 class FunctionSignatureEvaluated {
 public:
-    std::vector < std::string > identifiers;
+    std::vector <std::string> identifiers;
     std::vector <Type> types;
     std::vector <int> size_in, size_out;
     std::vector <bool> is_const;
 };
 
 struct State {
-    std::vector < std::pair <int, int> > heap;
+    std::vector <std::pair <int, int>> heap;
 };
 
 struct VLContext {
-    std::vector < std::string > variable_stack;
+    std::vector <std::string> variable_stack;
     std::vector <Type> variable_type_stack;
     std::vector <bool> variable_is_const_stack;
-    std::vector < std::string > function_stack;
-    std::vector < std::shared_ptr <FunctionSignature> > function_signature_stack;
+    std::vector <std::string> function_stack;
+    std::vector <std::shared_ptr <FunctionSignature>> function_signature_stack;
     std::vector <FunctionDefinition*> function_pointer_stack;
-    std::vector < std::set <FunctionSignatureEvaluated> > function_signature_validated;
+    std::vector <std::set <FunctionSignatureEvaluated>> function_signature_validated;
     std::vector <int> packet_size;
     std::set <State> states;
-    std::vector < std::pair <std::string, int> > metavariable_stack;
+    std::vector <std::pair <std::string, int>> metavariable_stack;
 };
 
 struct CPContext {
@@ -78,7 +79,7 @@ struct CPContext {
     std::vector <Type> variable_stack_type;
     std::vector <std::string> variable_arguments;
     std::vector <Type> variable_arguments_type;
-    std::vector < std::pair < std::string, int> > function_stack;
+    std::vector <std::pair <std::string, int>> function_stack;
     int function_index = 0;
     int branch_index = 0;
 };
@@ -111,7 +112,7 @@ public:
 
 class If : public Statement {
 public:
-    std::vector < std::pair <std::shared_ptr <Expression>, std::shared_ptr<Block>>> branch_list;
+    std::vector <std::pair <std::shared_ptr <Expression>, std::shared_ptr<Block>>> branch_list;
     std::shared_ptr <Block> else_body;
     void Validate(VLContext &context);
     void Compile(std::ostream &out, CPContext &context);

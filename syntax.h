@@ -29,6 +29,8 @@ namespace Syntax {
     std::shared_ptr <AST::Block> ProcessBlock(TokenStream&);
     std::shared_ptr <AST::Expression> ProcessExpression(TokenStream&);
     std::shared_ptr <AST::Expression> ProcessPrimary(TokenStream&);
+    std::shared_ptr <AST::FunctionSignature> ProcessFunctionSignature(TokenStream &ts);
+    std::vector     <std::string> ProcessMetavariables(TokenStream &ts);
     std::shared_ptr <AST::Statement> ProcessStatement(TokenStream&);
     std::shared_ptr <AST::Node> Process(const std::vector <Token> token_stream);
 }
