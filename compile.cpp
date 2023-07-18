@@ -38,7 +38,7 @@ Type getVariableType(std::string id, Node *node, CPContext &context) {
     exit(1);
 }
 
-int findFunctionIndex(std::string &identifier, CPContext &context) {
+int getFunctionIndex(std::string &identifier, CPContext &context) {
     for (int i = (int)context.function_stack.size() - 1; i >= 0; i--) {
         if (context.function_stack[i].first == identifier) {
             return context.function_stack[i].second;
@@ -48,7 +48,7 @@ int findFunctionIndex(std::string &identifier, CPContext &context) {
     exit(1);
 }
 
-int findPhase(std::string &identifier, CPContext &context) {
+int getPhase(std::string &identifier, CPContext &context) {
     int idx = findInLocal(identifier, context);
     if (idx != -1) {
         return -(idx + 1) * 4;
@@ -88,10 +88,10 @@ void Block::Compile(std::ostream &out, CPContext &context) {
         (*i)->Compile(out, context);
     }
     out << "add esp, " << 4 * (context.variable_stack.size() - old_variable_stack_size) << "\n";
-    while (context.variable_stack.size() > old_variable_stack_size)
+    while (context.variable_stack.size() > old_variable_stack_size) {
         context.variable_stack.pop_back();
-    while (context.variable_stack_type.size() > old_variable_stack_size)
         context.variable_stack_type.pop_back();
+    }
     while (context.function_stack.size() > old_function_stack_size)
         context.function_stack.pop_back();
 }
@@ -156,8 +156,11 @@ void FunctionDefinition::Compile(std::ostream &out, CPContext &context) {
     out << "sub esp, " << (signature->identifiers.size() + 2) * 4 << "\n";
     
     std::vector <std::string> variable_stack = context.variable_stack;
+    std::vector <Type> variable_stack_type = context.variable_stack_type;
     std::vector <std::string> variable_arguments = context.variable_arguments;
+    std::vector <Type> variable_arguments_type = context.variable_arguments_type;
     context.variable_stack.clear();
+    context.variable_stack_type.clear();
     context.variable_arguments.clear();
     context.variable_arguments_type.clear();
     context.function_stack.push_back({name, index});
@@ -171,7 +174,9 @@ void FunctionDefinition::Compile(std::ostream &out, CPContext &context) {
     }
     body->Compile(out, context);
     context.variable_stack = variable_stack;
+    context.variable_stack_type = variable_stack_type;
     context.variable_arguments = variable_arguments;
+    context.variable_arguments_type = variable_arguments_type;
 
     out << "leave\n";
     out << "ret\n";
@@ -226,7 +231,7 @@ void Assignment::Compile(std::ostream &out, CPContext &context) {
 
     out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> assignment\n";
     value->Compile(out, context);
-    int phase = findPhase(identifier, context);
+    int phase = getPhase(identifier, context);
     out << "mov eax, [esp - 4]\n";
     out << "mov [ebp + " << phase << "], eax\n";
 }
@@ -234,7 +239,7 @@ void Assignment::Compile(std::ostream &out, CPContext &context) {
 void Movement::Compile(std::ostream &out, CPContext &context) {
     out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> movement\n";
     value->Compile(out, context);
-    int phase = findPhase(identifier, context);
+    int phase = getPhase(identifier, context);
     out << "mov eax, [esp - 4]\n";
     out << "mov ebx, [ebp + " << phase << "]\n";
     out << "mov [ebx], eax\n";
@@ -257,7 +262,7 @@ void MovementString::Compile(std::ostream &out, CPContext &context) {
     }
     out << "_strbufend" << idx << ":\n";
     out << "mov esi, _strbuf" << idx << "\n";
-    int phase = findPhase(identifier, context);
+    int phase = getPhase(identifier, context);
     out << "mov edi, [ebp + " << phase << "]\n";
     out << "mov ecx, " << (int)value.size() << "\n";
     out << "rep movsb\n";
@@ -272,7 +277,7 @@ void Assumption::Compile(std::ostream &out, CPContext &context) {
     out << "error" << ind_error << " db \"" << error << "\", 0xA\n";
     out << "aftererror" << ind_error << ":\n";
 
-    int phase = findPhase(identifier, context);
+    int phase = getPhase(identifier, context);
     int idx = context.branch_index++;
     left->Compile(out, context);
     out << "mov eax, [ebp + " << phase << "]\n";
@@ -312,7 +317,7 @@ void Assumption::Compile(std::ostream &out, CPContext &context) {
 
 void Identifier::Compile(std::ostream &out, CPContext &context) {
     out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> identifier\n";
-    int phase = findPhase(identifier, context);
+    int phase = getPhase(identifier, context);
     out << "mov eax, [ebp + " << phase << "]\n";
     out << "mov [esp - 4], eax\n";
 }
@@ -367,14 +372,14 @@ void Free::Compile(std::ostream &out, CPContext &context) {
 void FunctionCall::Compile(std::ostream &out, CPContext &context) {
     out << "; " << filename << " " << line_begin + 1 << ":" << position_begin + 1 << " -> function call\n";
     for (int i = (int)arguments.size() - 1; i >= 0; i--) {
-        int phase = findPhase(arguments[i], context);
+        int phase = getPhase(arguments[i], context);
         out << "push dword [ebp + " << phase << "]\n";
     }
     for (int i = (int)metavariables.size() - 1; i >= 0; i--) {
         metavariables[i].second->Compile(out, context);
         out << "push dword [esp - 4]\n";
     }
-    int idx = findFunctionIndex(identifier, context);
+    int idx = getFunctionIndex(identifier, context);
     if (idx == -1) {
         out << "call " << identifier << "\n";
     }
@@ -383,7 +388,7 @@ void FunctionCall::Compile(std::ostream &out, CPContext &context) {
     }
     out << "add esp, " << (int)(arguments.size() + metavariables.size()) * 4 << "\n";
     for (int i = (int)arguments.size() - 1; i >= 0; i--) {
-        int phase = findPhase(arguments[i], context);
+        int phase = getPhase(arguments[i], context);
         out << "mov eax, [esp - " << (((int)arguments.size() - i) * 4) << "]\n";
         out << "mov [ebp + " << phase << "], eax\n";
     }
@@ -402,9 +407,11 @@ void Addition::Compile(std::ostream &out, CPContext &context) {
     left->Compile(out, context);
     out << "sub esp, 4\n";
     context.variable_stack.push_back("__junk");
+    context.variable_stack_type.push_back(Type::Int);
     right->Compile(out, context);
     out << "add esp, 4\n";
     context.variable_stack.pop_back();
+    context.variable_stack_type.pop_back();
     out << "mov eax, [esp - 4]\n";
     out << "add eax, [esp - 8]\n";
     out << "mov [esp - 4], eax\n";
@@ -415,9 +422,11 @@ void Subtraction::Compile(std::ostream &out, CPContext &context) {
     left->Compile(out, context);
     out << "sub esp, 4\n";
     context.variable_stack.push_back("__junk");
+    context.variable_stack_type.push_back(Type::Int);
     right->Compile(out, context);
     out << "add esp, 4\n";
     context.variable_stack.pop_back();
+    context.variable_stack_type.pop_back();
     out << "mov eax, [esp - 4]\n";
     out << "sub eax, [esp - 8]\n";
     out << "mov [esp - 4], eax\n";
@@ -428,9 +437,11 @@ void Multiplication::Compile(std::ostream &out, CPContext &context) {
     left->Compile(out, context);
     out << "sub esp, 4\n";
     context.variable_stack.push_back("__junk");
+    context.variable_stack_type.push_back(Type::Int);
     right->Compile(out, context);
     out << "add esp, 4\n";
     context.variable_stack.pop_back();
+    context.variable_stack_type.pop_back();
     out << "mov eax, [esp - 4]\n";
     out << "mov edx, [esp - 8]\n";
     out << "mul edx\n";
@@ -442,9 +453,11 @@ void Division::Compile(std::ostream &out, CPContext &context) {
     left->Compile(out, context);
     out << "sub esp, 4\n";
     context.variable_stack.push_back("__junk");
+    context.variable_stack_type.push_back(Type::Int);
     right->Compile(out, context);
     out << "add esp, 4\n";
     context.variable_stack.pop_back();
+    context.variable_stack_type.pop_back();
     out << "mov eax, [esp - 4]\n";
     out << "mov edx, 0\n";
     out << "div dword [esp - 8]\n";
@@ -456,9 +469,11 @@ void Less::Compile(std::ostream &out, CPContext &context) {
     left->Compile(out, context);
     out << "sub esp, 4\n";
     context.variable_stack.push_back("__junk");
+    context.variable_stack_type.push_back(Type::Int);
     right->Compile(out, context);
     out << "add esp, 4\n";
     context.variable_stack.pop_back();
+    context.variable_stack_type.pop_back();
     out << "mov eax, [esp - 4]\n";
     out << "sub eax, [esp - 8]\n";
     int idx = context.branch_index++;
@@ -475,9 +490,11 @@ void Equal::Compile(std::ostream &out, CPContext &context) {
     left->Compile(out, context);
     out << "sub esp, 4\n";
     context.variable_stack.push_back("__junk");
+    context.variable_stack_type.push_back(Type::Int);
     right->Compile(out, context);
     out << "add esp, 4\n";
     context.variable_stack.pop_back();
+    context.variable_stack_type.pop_back();
     out << "mov eax, [esp - 4]\n";
     out << "sub eax, [esp - 8]\n";
     int idx = context.branch_index++;
